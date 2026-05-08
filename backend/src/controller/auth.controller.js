@@ -34,8 +34,14 @@ const newUser = new User({
 });
 
 if (newUser) {
-  const token = generateToken(newUser._id, res);
-  await newUser.save();
+  //before Cr:
+  //const token = generateToken(newUser._id, res);
+  //await newUser.save();
+   
+  //after Cr:
+ //persist user first, then issue auth cookie
+ const savedUser = await newUser.save();
+ generateToken(savedUser._id, res);
 
   res.status(201).json({
     _id: newUser._id,
