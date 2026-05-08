@@ -19,5 +19,8 @@
   "bugs": {
     "url": "https://github.com/olawoyinabdulsalam202-star/chatify/issues"
   },
-  "homepage": "https://github.com/olawoyinabdulsalam202-star/chatify#readme"
+  "homepage": "https://github.com/olawoyinabdulsalam202-star/chatify#readme",
+  "dependencies": {
+    "cloudinary": "^2.5.1"
+  }
 }
