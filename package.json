@@ -19,5 +19,10 @@
   "bugs": {
     "url": "https://github.com/olawoyinabdulsalam202-star/chatify/issues"
   },
-  "homepage": "https://github.com/olawoyinabdulsalam202-star/chatify#readme"
+  "homepage": "https://github.com/olawoyinabdulsalam202-star/chatify#readme",
+  "dependencies": {
+    "@arcjet/inspect": "^1.4.0",
+    "@arcjet/node": "^1.4.0",
+    "cloudinary": "^2.5.1"
+  }
 }
