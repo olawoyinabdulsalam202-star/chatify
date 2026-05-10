@@ -23,6 +23,7 @@
   "dependencies": {
     "@arcjet/inspect": "^1.4.0",
     "@arcjet/node": "^1.4.0",
-    "cloudinary": "^2.5.1"
+    "cloudinary": "^2.5.1",
+    "react-router": "^7.15.0"
   }
 }
