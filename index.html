@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <!-- viewport-fit=cover lets the layout extend under a notch/home indicator,
+         which is what the env(safe-area-inset-*) padding in index.css relies on.
+         Without it iOS letterboxes the page and the app looks inset and cramped. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Tells iOS to run from the home screen as a standalone app (no Safari
+         chrome), matching the manifest's display:standalone on Android. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Havn" />
+
+    <title>Havn — a calmer place to talk</title>
+    <meta name="description" content="Havn is a private, calm messaging app. Send messages, voice notes, photos, and calls without the noise." />
+    <meta name="keywords" content="havn, private chat, messaging app, secure chat, voice notes, calls" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph / link previews -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Havn — a calmer place to talk" />
+    <meta property="og:description" content="A private, calm messaging app. Messages, voice notes, photos, and calls without the noise." />
+    <meta property="og:image" content="/icon.svg" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Havn — a calmer place to talk" />
+    <meta name="twitter:description" content="A private, calm messaging app. Messages, voice notes, photos, and calls without the noise." />
+    <meta name="twitter:image" content="/icon.svg" />
+
+    <!-- PWA -->
+    <meta name="theme-color" content="#141311" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

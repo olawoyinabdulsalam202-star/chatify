@@ -1,0 +1,230 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   HAVN THEME PALETTES
+   ------------------------------------------------------------
+   tailwind.config.js maps every slate and cyan class to these
+   variables, so redefining them per theme re-colors the whole app
+   without touching any component. `slate` carries the warm neutral
+   grays; `cyan` carries the terracotta accent (#C2410C).
+
+   Values are bare "R G B" channels, not hex — that's what lets
+   Tailwind's opacity modifiers (bg-slate-800/50) keep working.
+
+   --c-slate-* runs 50 (lightest) to 950 (darkest) on the dark theme.
+   On the light theme the neutral ramp is INVERTED: 50 is darkest,
+   950 is lightest. That inversion is what makes light mode work at
+   all — the components ask for bg-slate-900 as a page background and
+   text-slate-200 for body copy, so on light slate-900 resolves to
+   near-white and slate-200 to near-black. The accent ramp is not
+   inverted; only its low shades (300/400) darken on light so accent
+   text stays legible on the off-white ground.
+   ============================================================ */
+
+:root,
+[data-theme="dark"] {
+  --c-slate-50: 245 242 237;
+  --c-slate-100: 236 231 224;
+  --c-slate-200: 222 215 205;
+  --c-slate-300: 198 189 177;
+  --c-slate-400: 156 146 134;
+  --c-slate-500: 120 110 100;
+  --c-slate-600: 90 82 72;
+  --c-slate-700: 60 54 47;
+  --c-slate-800: 39 35 30;
+  --c-slate-900: 20 19 17;
+  --c-slate-950: 13 12 10;
+
+  --c-cyan-50: 255 247 237;
+  --c-cyan-100: 255 237 219;
+  --c-cyan-200: 252 213 178;
+  --c-cyan-300: 247 179 128;
+  --c-cyan-400: 237 137 74;
+  --c-cyan-500: 194 65 12;
+  --c-cyan-600: 168 56 14;
+  --c-cyan-700: 138 47 15;
+  --c-cyan-800: 110 38 15;
+  --c-cyan-900: 82 30 14;
+  --c-cyan-950: 48 18 9;
+}
+
+[data-theme="light"] {
+  --c-slate-50: 28 24 20;
+  --c-slate-100: 42 37 31;
+  --c-slate-200: 58 51 43;
+  --c-slate-300: 92 82 71;
+  --c-slate-400: 130 118 105;
+  --c-slate-500: 165 152 137;
+  --c-slate-600: 197 185 170;
+  --c-slate-700: 224 215 203;
+  --c-slate-800: 240 234 225;
+  --c-slate-900: 250 247 242;
+  --c-slate-950: 255 254 250;
+
+  --c-cyan-50: 60 20 10;
+  --c-cyan-100: 82 28 12;
+  --c-cyan-200: 116 40 14;
+  --c-cyan-300: 150 50 16;
+  --c-cyan-400: 176 56 14;
+  --c-cyan-500: 194 65 12;
+  --c-cyan-600: 158 52 14;
+  --c-cyan-700: 210 120 70;
+  --c-cyan-800: 232 168 128;
+  --c-cyan-900: 246 210 186;
+  --c-cyan-950: 255 240 231;
+}
+
+:root {
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+  --user-font-family: inherit;
+}
+
+.input {
+  @apply w-full bg-slate-800/50 border border-slate-700 rounded-lg py-2 pl-10 pr-4 text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent;
+}
+
+.auth-input-icon {
+  @apply absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 size-5;
+}
+
+.auth-input-label {
+  @apply block text-sm font-medium text-slate-300 mb-2;
+}
+
+.auth-badge {
+  @apply inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-cyan-500/15 text-cyan-300;
+}
+
+.auth-btn {
+  @apply w-full bg-cyan-500 text-white rounded-lg py-2.5 font-medium hover:bg-cyan-600 focus:ring-2 focus:ring-cyan-500 transition-colors;
+}
+
+.auth-link {
+  @apply px-4 py-2 inline-block bg-cyan-500/10 rounded-lg text-cyan-400 hover:text-cyan-500 text-sm transition-colors;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+/* Font size preference from Settings page */
+.font-size-small {
+  font-size: 0.875rem;
+}
+.font-size-medium {
+  font-size: 1rem;
+}
+.font-size-large {
+  font-size: 1.15rem;
+}
+
+body {
+  font-family: var(--user-font-family, inherit);
+  /* Stops iOS Safari bouncing the whole page when a scrollable list hits its
+     end, which in a chat app reads as the UI coming loose. */
+  overscroll-behavior-y: none;
+}
+
+/* Keep the app clear of the notch and the home indicator. Paired with
+   viewport-fit=cover in index.html — without that meta tag these insets are
+   always 0 and iOS letterboxes the page instead. */
+@supports (padding: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* iOS zooms the page in when a focused input's font-size is under 16px, and
+   never zooms back out — the classic "the app got stuck zoomed" bug. 16px is
+   the threshold, so inputs must not go below it on touch devices. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+.chat-bubble {
+  font-family: var(--user-font-family, inherit);
+  color: var(--user-font-color, inherit);
+  /* Long links and unbroken strings used to force the bubble wider than the
+     screen, which made the whole chat pan sideways on a phone. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* On touch devices there's no hover, so a long-press reveals a message's
+   actions. Suppress the native text-selection and iOS callout menu the press
+   would otherwise trigger on the bubble. Desktop (which has hover) keeps normal
+   text selection. */
+@media (hover: none) {
+  .chat-bubble {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
+/* ============================================================
+   GLOBAL POLISH
+   App-wide finish that individual components shouldn't each
+   re-solve: scrollbars, selection, focus, and text rendering.
+   ============================================================ */
+
+/* Body ground matches the app shell so the safe-area insets and any
+   overscroll gap don't flash white (near-white on the light theme). */
+body {
+  background-color: rgb(var(--c-slate-900));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The full-bleed public pages (landing, legal) are always the light brand
+   ground, whatever the theme — match the body so the safe-area insets show that
+   ground instead of a dark bar around them. App.jsx tags the body per route. */
+body[data-fullbleed="true"] {
+  background-color: #faf7f2;
+}
+
+/* Thin, theme-colored scrollbars — the default chunky gray bar reads as
+   unfinished against the warm ground. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--c-slate-600)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--c-slate-600));
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(var(--c-slate-500));
+}
+
+/* Brand the text selection instead of the browser default. */
+::selection {
+  background-color: rgb(var(--c-cyan-500) / 0.3);
+}
+
+/* Visible keyboard focus for anything focusable that doesn't paint its own
+   ring. Keyboard-only (:focus-visible) so mouse clicks stay clean. */
+:focus-visible {
+  outline: 2px solid rgb(var(--c-cyan-500));
+  outline-offset: 2px;
+}
