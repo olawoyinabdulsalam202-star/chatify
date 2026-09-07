@@ -3,6 +3,7 @@ import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { setAppBadge } from "../lib/push";
+import { playNotificationSound } from "../lib/audioUnlock";
 
 // Keeps references to the handlers currently attached to the socket, so
 // unsubscribe can remove exactly those (and not a shared-event listener
@@ -415,11 +416,13 @@ export const useChatStore = create((set, get) => ({
 
           // Play sound. Without this global handler, sound only played when the
           // message arrived from someone whose chat you already had open — every
-          // other message was silent.
+          // other message was silent. Routed through the element primed on the
+          // first user gesture (see audioUnlock) rather than a fresh `new Audio`
+          // per message: the browser's autoplay grant attaches to a specific
+          // element, so a just-constructed one is blocked in production and the
+          // ping never sounded.
           if (isSoundEnabled) {
-            const notificationSound = new Audio("/sounds/notification.mp3");
-            notificationSound.currentTime = 0;
-            notificationSound.play().catch((e) => console.log("Audio play failed:", e));
+            playNotificationSound();
           }
         }
 

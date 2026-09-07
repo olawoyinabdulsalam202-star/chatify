@@ -222,6 +222,26 @@ export const useAuthStore = create((set, get) => ({
       }
     });
 
+    // Presence is now delivered per-friend: getOnlineUsers is the bootstrap
+    // snapshot on connect, and this is the incremental delta as a single friend
+    // comes or goes. Applying just the one id (rather than replacing the whole
+    // array) is what keeps one friend's change from clobbering the rest.
+    socket.on("presenceUpdate", ({ userId, online }) => {
+      const previous = get().onlineUsers;
+      if (online) {
+        if (!previous.includes(userId)) set({ onlineUsers: [...previous, userId] });
+      } else {
+        set({ onlineUsers: previous.filter((id) => id !== userId) });
+        // Same reason as above: refetch so the freshly-written lastSeenAt shows
+        // as "last seen …" instead of a bare "Offline".
+        import("./useChatStore").then(({ useChatStore }) => {
+          const chat = useChatStore.getState();
+          chat.getMyChatPartners({ quiet: true });
+          chat.getAllContacts({ quiet: true });
+        });
+      }
+    });
+
     socket.on("accountBanned", ({ reason }) => {
       toast.error(reason ? `Your account was banned: ${reason}` : "Your account was banned.");
       get().logout();

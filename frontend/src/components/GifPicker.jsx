@@ -11,6 +11,11 @@ function GifPicker({ onSelect, onClose, embedded = false, query: externalQuery =
   const query = embedded ? externalQuery : localQuery;
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  // Set when a request actually fails (bad/expired key, rate limit, network)
+  // as opposed to succeeding with zero results — so the two aren't shown with
+  // the same "no GIFs" text. This was the production symptom: a key that worked
+  // in dev but wasn't set in the deploy looked identical to "nothing trending".
+  const [error, setError] = useState(false);
   // Guards against a slow earlier request landing after a newer one and
   // overwriting fresher results with stale ones.
   const requestId = useRef(0);
@@ -19,6 +24,7 @@ function GifPicker({ onSelect, onClose, embedded = false, query: externalQuery =
     if (!GIPHY_KEY) return;
     const id = ++requestId.current;
     setIsLoading(true);
+    setError(false);
     try {
       const endpoint = q.trim()
         ? `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(
@@ -26,10 +32,16 @@ function GifPicker({ onSelect, onClose, embedded = false, query: externalQuery =
           )}&limit=18&rating=pg-13`
         : `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=18&rating=pg-13`;
       const res = await fetch(endpoint);
+      // Giphy answers a bad or unauthorized key with a non-2xx status rather
+      // than throwing, so an explicit res.ok check is what catches it.
+      if (!res.ok) throw new Error(`Giphy responded ${res.status}`);
       const data = await res.json();
       if (id === requestId.current) setResults(data.data || []);
     } catch {
-      if (id === requestId.current) setResults([]);
+      if (id === requestId.current) {
+        setResults([]);
+        setError(true);
+      }
     } finally {
       if (id === requestId.current) setIsLoading(false);
     }
@@ -73,6 +85,10 @@ function GifPicker({ onSelect, onClose, embedded = false, query: externalQuery =
         <div className="flex items-center justify-center h-full text-slate-500">
           <LoaderIcon className="w-5 h-5 animate-spin" />
         </div>
+      ) : error ? (
+        <p className="text-xs text-red-400 text-center py-6 px-3">
+          Couldn't reach Giphy. The GIF service may be misconfigured or temporarily down.
+        </p>
       ) : results.length === 0 ? (
         <p className="text-xs text-slate-500 text-center py-6">
           {query.trim() ? "No GIFs found. Try another search." : "No trending GIFs right now."}

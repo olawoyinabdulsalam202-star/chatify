@@ -15,8 +15,14 @@
 // the ringtone plays through, which is why this module owns it.
 
 const RINGTONE_SRC = "/sounds/notification.mp3";
+// Same asset, its own element. The message ping must not share state with the
+// looping ringtone (a call can be ringing when a message lands), and the
+// browser's autoplay grant attaches per element — so this one has to be primed
+// separately during the unlock gesture or it stays blocked forever.
+const NOTIFICATION_SRC = "/sounds/notification.mp3";
 
 let ringtone = null;
+let notifSound = null;
 let unlocked = false;
 let initialized = false;
 const listeners = new Set();
@@ -28,6 +34,30 @@ function getRingtone() {
     ringtone.preload = "auto";
   }
   return ringtone;
+}
+
+function getNotifSound() {
+  if (!notifSound) {
+    notifSound = new Audio(NOTIFICATION_SRC);
+    notifSound.preload = "auto";
+  }
+  return notifSound;
+}
+
+// Plays an element inaudibly and immediately pauses it. That counts as
+// user-initiated playback, which permanently blesses that specific element so
+// every later play() on it is allowed with no fresh gesture. volume is always
+// restored to 1, even if play() rejects, so a failed attempt can never leave an
+// element permanently silent.
+async function prime(audio) {
+  try {
+    audio.volume = 0;
+    await audio.play();
+    audio.pause();
+    audio.currentTime = 0;
+  } finally {
+    audio.volume = 1;
+  }
 }
 
 function notify() {
@@ -43,32 +73,30 @@ function notify() {
 async function unlock() {
   if (unlocked) return true;
 
-  const audio = getRingtone();
-
   try {
     // Volume 0 rather than `muted`: muted playback is always permitted and so
     // grants nothing, while a real (if inaudible) play is what earns the
     // permission. The user hears nothing either way.
-    audio.volume = 0;
-    await audio.play();
-    audio.pause();
-    audio.currentTime = 0;
+    await prime(getRingtone());
+
+    // Prime the message ping on the SAME gesture. Its autoplay grant is
+    // independent of the ringtone's, so this is the only chance to bless it —
+    // this is the fix for "notification sound is silent in production", where
+    // the chat store's per-message `new Audio()` had never earned permission
+    // and was blocked. Best-effort: a failure here must not undo the ringtone
+    // unlock, so it's swallowed and the ping simply retries on a later gesture.
+    try {
+      await prime(getNotifSound());
+    } catch {
+      // ignore — ping stays silent until a future gesture primes it
+    }
+
     unlocked = true;
     return true;
   } catch {
     // Still blocked — the caller falls back to vibration and a visible
     // tap-to-enable-sound control.
     return false;
-  } finally {
-    // Always restore full volume, never a "previous" value.
-    //
-    // This used to capture audio.volume before muting and restore that. Two
-    // ways that silenced the ringtone: the restore runs in `finally`, so on the
-    // success path it could land while play() was still starting, and if unlock
-    // ever ran twice the second call captured the already-zeroed volume and
-    // wrote 0 back permanently. The element is ours and only ever plays the
-    // ringtone, so 1 is the only correct resting value.
-    audio.volume = 1;
   }
 }
 
@@ -137,6 +165,28 @@ export function stopRingtone() {
   if (!ringtone) return;
   ringtone.pause();
   ringtone.currentTime = 0;
+}
+
+// Fire-and-forget message ping. Plays through the persistent element primed at
+// unlock, so it sounds even long after the last gesture — unlike the per-message
+// `new Audio("/sounds/notification.mp3")` the chat store built before, which
+// never earned autoplay permission and was silently swallowed in production.
+// Non-looping, and rewound to the start each call so back-to-back messages each
+// ping instead of one being ignored because the last is still playing.
+export function playNotificationSound() {
+  const audio = getNotifSound();
+  audio.loop = false;
+  audio.volume = 1;
+  audio.muted = false;
+  try {
+    audio.currentTime = 0;
+  } catch {
+    // Metadata not loaded yet; it'll start from 0 on its own.
+  }
+  audio.play().catch(() => {
+    // Still blocked because no gesture ever landed. Nothing to do — the unread
+    // badge already reflects the message, so we just stay silent.
+  });
 }
 
 // Vibration is a separate permission track from audio: it works without a prior

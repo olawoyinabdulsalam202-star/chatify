@@ -21,6 +21,11 @@ import {
   notificationPermission,
 } from "../lib/push";
 
+// Compiled in by vite.config.js's `define`; "dev" when running unbuilt so the
+// About screen still renders. Shown so QA can match the live site to a commit.
+const COMMIT_HASH = typeof __COMMIT_HASH__ === "string" ? __COMMIT_HASH__ : "dev";
+const BUILT_AT = typeof __BUILT_AT__ === "string" ? __BUILT_AT__ : "local";
+
 // Must stay in sync with the palettes in index.css and the daisyui.themes list
 // in tailwind.config.js — a name present here but missing there would render as
 // the default theme and look like the picker was ignoring the click.
@@ -504,6 +509,9 @@ function SettingsPage() {
         <p className="text-sm text-slate-200 font-medium">Havn</p>
         <p className="text-xs text-slate-500 mt-1">
           Private messaging — direct chats, groups, calls and stories.
+        </p>
+        <p className="text-[11px] text-slate-600 mt-3 font-mono">
+          build {COMMIT_HASH} · {BUILT_AT}
         </p>
       </div>
       <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden divide-y divide-slate-700/50">

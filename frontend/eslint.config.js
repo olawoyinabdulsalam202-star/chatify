@@ -17,9 +17,11 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: {
         ...globals.browser,
-        // Compiled in by vite.config.js's `define`, so it exists at runtime but
-        // has no declaration for ESLint to find.
+        // Compiled in by vite.config.js's `define`, so they exist at runtime but
+        // have no declaration for ESLint to find.
         __BUILD_ID__: 'readonly',
+        __COMMIT_HASH__: 'readonly',
+        __BUILT_AT__: 'readonly',
       },
       parserOptions: {
         ecmaVersion: 'latest',

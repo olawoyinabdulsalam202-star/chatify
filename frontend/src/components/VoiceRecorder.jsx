@@ -8,6 +8,21 @@ function formatDuration(seconds) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// Chrome/Firefox record webm/opus; Safari can't and records mp4/aac instead.
+// The Blob's declared type has to match what MediaRecorder actually produced,
+// or the receiver is handed a mp4 labeled "audio/webm" and can't decode it —
+// that was the "Couldn't play this voice note" bug. Pick the first type the
+// browser confirms it supports and use that exact string for both.
+function pickAudioMimeType() {
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported) {
+    for (const type of candidates) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+  }
+  return "";
+}
+
 // onSend receives { audio: base64DataUrl, audioDuration: seconds }
 function VoiceRecorder({ onSend, onCancel }) {
   const [isRecording, setIsRecording] = useState(false);
@@ -17,6 +32,7 @@ function VoiceRecorder({ onSend, onCancel }) {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const mediaRecorderRef = useRef(null);
+  const mimeTypeRef = useRef("");
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
@@ -37,14 +53,19 @@ function VoiceRecorder({ onSend, onCancel }) {
       streamRef.current = stream;
       chunksRef.current = [];
 
-      const recorder = new MediaRecorder(stream);
+      const mimeType = pickAudioMimeType();
+      mimeTypeRef.current = mimeType;
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        // Prefer the type the recorder reports; fall back to what we asked for.
+        // Never hardcode webm — that mislabels Safari's mp4 and breaks playback.
+        const type = mediaRecorderRef.current?.mimeType || mimeTypeRef.current || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type });
         setPreviewBlob(blob);
         setPreviewUrl(URL.createObjectURL(blob));
       };

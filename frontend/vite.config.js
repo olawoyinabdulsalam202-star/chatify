@@ -2,6 +2,24 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { execSync } from 'node:child_process'
+
+// Short commit the bundle was built from, shown in Settings -> About so QA can
+// confirm the live site matches the latest commit before chasing a bug that's
+// already fixed (a stale deploy has burned us before). Vercel builds from a
+// detached checkout where `git rev-parse` can be unavailable, so its own
+// VERCEL_GIT_COMMIT_SHA is the fallback; "unknown" if neither answers.
+function resolveCommitHash() {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim()
+  } catch {
+    const sha = process.env.VERCEL_GIT_COMMIT_SHA
+    return sha ? sha.slice(0, 7) : 'unknown'
+  }
+}
+
+const COMMIT_HASH = resolveCommitHash()
+const BUILT_AT = new Date().toISOString()
 
 // One id per build, stamped into two places: compiled into the bundle as
 // __BUILD_ID__, and written to dist/version.json.
@@ -24,7 +42,7 @@ function versionManifest() {
       mkdirSync(outDir, { recursive: true })
       writeFileSync(
         resolve(outDir, 'version.json'),
-        JSON.stringify({ buildId: BUILD_ID, builtAt: new Date().toISOString() }) + '\n'
+        JSON.stringify({ buildId: BUILD_ID, commit: COMMIT_HASH, builtAt: BUILT_AT }) + '\n'
       )
     },
   }
@@ -35,5 +53,7 @@ export default defineConfig({
   plugins: [react(), versionManifest()],
   define: {
     __BUILD_ID__: JSON.stringify(BUILD_ID),
+    __COMMIT_HASH__: JSON.stringify(COMMIT_HASH),
+    __BUILT_AT__: JSON.stringify(BUILT_AT),
   },
 })
