@@ -57,3 +57,29 @@ export const ENV = {
   ADMIN_EMAILS: (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),
 };
 
+// Fail fast in production if a secret the app cannot run without is missing.
+// A missing JWT_SECRET makes every successful login throw inside generateToken
+// and surface as a generic 500; missing Cloudinary keys turn every image, video
+// and voice-note upload into a 500 — both look like code bugs but are really an
+// empty dashboard env var. Refusing to boot and naming the exact culprit is far
+// louder than discovering it from a stack trace days later.
+//
+// Deliberately production-only: `npm run dev` must keep working with a partial
+// .env (no Cloudinary, no push keys, etc.), so this never runs locally.
+if (ENV.NODE_ENV === "production") {
+  const REQUIRED = [
+    "JWT_SECRET",
+    "MONGO_URI",
+    "CLOUDINARY_CLOUD_NAME",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+  ];
+  const missing = REQUIRED.filter((key) => !ENV[key]);
+  if (missing.length > 0) {
+    console.error(
+      `FATAL: missing required environment variable(s) in production: ${missing.join(", ")}`
+    );
+    process.exit(1);
+  }
+}
+
