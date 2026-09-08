@@ -1,4 +1,4 @@
-import { sendWelcomeEmail, sendOTPEmail } from "../emails/emailHandlers.js";
+import { sendWelcomeEmail, sendOTPEmail, sendPasswordResetEmail } from "../emails/emailHandlers.js";
 import { generateToken, clearAuthCookie, AUTH_COOKIE_NAME } from "../lib/utils.js";
 import User from "../modules/User.js";
 import jwt from "jsonwebtoken";
@@ -210,6 +210,125 @@ export const resendOTP = async (req, res) => {
     res.status(200).json({ message: "A new code has been sent to your email" });
   } catch (error) {
     console.log("Error in resendOTP controller:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Step 1 of the reset flow: mail a one-time code to a registered address.
+//
+// Every path returns the same generic 200 so the endpoint can't be used to
+// enumerate which emails have accounts — a wrong address, an unverified one, a
+// banned one, and one still inside the resend cooldown all look identical to
+// the caller. The code is only actually generated and sent for a verified,
+// unbanned account that's past the cooldown.
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email is required" });
+    if (!isPlainString(email)) return res.status(400).json({ message: "Invalid input" });
+
+    const genericResponse = () =>
+      res.status(200).json({
+        message: "If an account exists for that email, a reset code is on its way.",
+      });
+
+    const user = await User.findOne({ email });
+    // An unverified account still has a pending signup code — it should finish
+    // that flow rather than reset a password it has never confirmed.
+    if (!user || !user.isVerified || user.isBanned) return genericResponse();
+
+    // Same 60s throttle as signup resends, but silent: surfacing a "please wait"
+    // message here would confirm the account exists.
+    if (
+      user.resetOtpLastSentAt &&
+      Date.now() - user.resetOtpLastSentAt.getTime() < OTP_RESEND_COOLDOWN_MS
+    ) {
+      return genericResponse();
+    }
+
+    const otp = generateOTP();
+    user.resetOtp = await bcrypt.hash(otp, 10);
+    user.resetOtpExpiry = new Date(Date.now() + OTP_EXPIRY_MS);
+    user.resetOtpLastSentAt = new Date();
+    user.resetOtpAttempts = 0;
+    await user.save();
+
+    try {
+      await sendPasswordResetEmail(user.email, user.fullName, otp);
+    } catch (error) {
+      console.error("Failed to send password reset email:", error);
+    }
+
+    return genericResponse();
+  } catch (error) {
+    console.log("Error in forgotPassword controller:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Step 2: verify the code and set the new password. Mirrors verifyOTP's
+// brute-force handling on the reset code — too many wrong guesses burns it.
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, password } = req.body;
+    if (!email || !otp || !password) {
+      return res.status(400).json({ message: "Email, code, and new password are required" });
+    }
+    if (!isPlainString(email) || !isPlainString(otp) || !isPlainString(password)) {
+      return res.status(400).json({ message: "Invalid input" });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    const user = await User.findOne({ email });
+    // Vague by design: a wrong email and a missing/expired code read the same,
+    // so neither confirms whether an account exists.
+    if (
+      !user ||
+      !user.resetOtp ||
+      !user.resetOtpExpiry ||
+      user.resetOtpExpiry.getTime() < Date.now()
+    ) {
+      return res
+        .status(400)
+        .json({ message: "This reset code is invalid or has expired. Please request a new one." });
+    }
+
+    const isOtpCorrect = await bcrypt.compare(otp, user.resetOtp);
+    if (!isOtpCorrect) {
+      user.resetOtpAttempts = (user.resetOtpAttempts || 0) + 1;
+      if (user.resetOtpAttempts >= MAX_OTP_ATTEMPTS) {
+        // Too many wrong guesses — kill the code so it can't be brute-forced.
+        user.resetOtp = undefined;
+        user.resetOtpExpiry = undefined;
+        user.resetOtpAttempts = 0;
+        await user.save();
+        return res
+          .status(400)
+          .json({ message: "Too many incorrect attempts. Please request a new code." });
+      }
+      await user.save();
+      return res.status(400).json({ message: "Incorrect code" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    user.resetOtp = undefined;
+    user.resetOtpExpiry = undefined;
+    user.resetOtpAttempts = 0;
+    // Proving control of the mailbox also lifts any login lockout — otherwise a
+    // user who got locked out is still stuck after setting a fresh password.
+    user.failedLoginAttempts = 0;
+    user.lockUntil = undefined;
+    await user.save();
+
+    // No auto-login: both the app and the admin console send the user back to
+    // their sign-in screen. That keeps the admin isAdmin gate on the normal
+    // login path and avoids issuing a session from an unauthenticated route.
+    res.status(200).json({ message: "Your password has been reset. You can now sign in." });
+  } catch (error) {
+    console.log("Error in resetPassword controller:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };
