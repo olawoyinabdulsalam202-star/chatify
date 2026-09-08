@@ -7,6 +7,8 @@ import LoginPage from "./pages/LoginPage";
 import SignUpPage from "./pages/SignUpPage";
 import SettingsPage from "./pages/SettingsPage";
 import OtpVerifyPage from "./pages/OtpVerifyPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminDashboardPage from "./pages/AdminDashboardPage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useCallStore } from "./store/useCallStore";
@@ -118,6 +120,14 @@ function App() {
               <SignUpPage />
             )
           }
+        />
+        <Route
+          path="/forgot-password"
+          element={authUser ? <Navigate to={"/"} /> : <ForgotPasswordPage />}
+        />
+        <Route
+          path="/reset-password"
+          element={authUser ? <Navigate to={"/"} /> : <ResetPasswordPage />}
         />
         <Route path="/settings" element={authUser ? <SettingsPage /> : <Navigate to={"/login"} />} />
         <Route

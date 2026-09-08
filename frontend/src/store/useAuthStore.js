@@ -15,6 +15,9 @@ export const useAuthStore = create((set, get) => ({
   isLoggingIn: false,
   isVerifyingOtp: false,
   pendingVerificationEmail: null, // set after signup, or after a login blocked by "unverified"
+  pendingResetEmail: null, // set after a "forgot password" request, drives the reset-code screen
+  isRequestingReset: false,
+  isResettingPassword: false,
   socket: null,
   onlineUsers: [],
 
@@ -65,6 +68,42 @@ export const useAuthStore = create((set, get) => ({
       toast.success(res.data.message || "Code resent");
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to resend code");
+    }
+  },
+
+  // Step 1 of "forgot password": ask the server to mail a reset code. The
+  // server answers the same way whether or not the address has an account (so
+  // it can't be used to probe for registered emails), which is why success
+  // here just means "advance to the code screen", not "the email exists".
+  forgotPassword: async (email) => {
+    set({ isRequestingReset: true });
+    try {
+      const res = await axiosInstance.post("/auth/forgot-password", { email });
+      set({ pendingResetEmail: email });
+      toast.success(res.data.message || "If an account exists, a reset code is on its way.");
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Couldn't start password reset");
+      return false;
+    } finally {
+      set({ isRequestingReset: false });
+    }
+  },
+
+  // Step 2: submit the code + new password. On success the caller sends the
+  // user back to the sign-in screen to use it (no auto-login — see the backend).
+  resetPassword: async ({ email, otp, password }) => {
+    set({ isResettingPassword: true });
+    try {
+      const res = await axiosInstance.post("/auth/reset-password", { email, otp, password });
+      set({ pendingResetEmail: null });
+      toast.success(res.data.message || "Password reset — you can now sign in.");
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Couldn't reset password");
+      return false;
+    } finally {
+      set({ isResettingPassword: false });
     }
   },
 
