@@ -8,6 +8,8 @@ import {
   updateSettings,
   verifyOTP,
   resendOTP,
+  forgotPassword,
+  resetPassword,
 } from "../controller/auth.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { arcjetProtection } from "../middleware/arcjet.middleware.js";
@@ -22,6 +24,8 @@ router.post("/verify-otp", verifyOTP);
 router.post("/resend-otp", resendOTP);
 router.post("/login", login);
 router.post("/logout", logout);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 router.put("/update-profile", protectRoute, updateProfile);
 router.put("/username", protectRoute, updateUsername);

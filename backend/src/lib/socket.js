@@ -49,17 +49,38 @@ const userSocketMap = {}; // { userId: Set<socketId> }
 const OFFLINE_GRACE_MS = 45000;
 const pendingOfflineTimers = {}; // { userId: Timeout }
 
-function broadcastOnlineUsers() {
-  io.emit("getOnlineUsers", onlineUserIds());
-}
-
 // The single source of truth for who's online. Controllers and helpers must
-// use this, not build their own copy from the map, so a broadcast and an
-// answer can never disagree about a user.
+// use this, not build their own copy from the map, so presence answers can
+// never disagree about a user.
 export function onlineUserIds() {
   return Object.keys(userSocketMap);
 }
 
+// Presence is friends-only. A user's online state is sent only to the people
+// they're mutually connected with — never io.emit'd to the whole connected
+// base, which used to leak every member's presence (and id) to everyone.
+async function friendIdsOf(userId) {
+  try {
+    const u = await User.findById(userId).select("friends");
+    return (u?.friends || []).map((f) => f.toString());
+  } catch {
+    return [];
+  }
+}
+
+// Fan a presence change out to a user's friends, each in their own per-user
+// room. This is the targeted replacement for the old global broadcast: X's
+// friends are exactly the set allowed to know whether X is online.
+async function emitPresenceToFriends(userId, online) {
+  const friends = await friendIdsOf(userId);
+  friends.forEach((fid) => {
+    io.to(`user:${fid}`).emit("presenceUpdate", { userId: String(userId), online });
+  });
+}
+
+// Returns whether this was a genuine offline->online transition. The caller
+// (the connection handler) owns the friends fan-out, since that needs a DB
+// lookup and must not block the map bookkeeping here.
 function markOnline(userId, socketId) {
   if (pendingOfflineTimers[userId]) {
     clearTimeout(pendingOfflineTimers[userId]);
@@ -68,7 +89,7 @@ function markOnline(userId, socketId) {
   const wasOffline = !userSocketMap[userId] || userSocketMap[userId].size === 0;
   if (!userSocketMap[userId]) userSocketMap[userId] = new Set();
   userSocketMap[userId].add(socketId);
-  if (wasOffline) broadcastOnlineUsers();
+  return wasOffline;
 }
 
 function scheduleOffline(userId, socketId) {
@@ -94,7 +115,12 @@ function scheduleOffline(userId, socketId) {
         { $set: { lastSeenAt: new Date() } }
       ).catch(() => {});
 
-      broadcastOnlineUsers();
+      // Diagnostic for hosted environments (Render): confirms the grace timer
+      // actually fired and the user was reaped, so a "nobody ever shows offline"
+      // report can be traced to whether this line prints in production logs.
+      console.log("Presence: user offline after grace window", userId);
+
+      emitPresenceToFriends(userId, false).catch(() => {});
     }
   }, OFFLINE_GRACE_MS);
 }
@@ -109,10 +135,10 @@ export function getReceiverSocketId(userId) {
 }
 
 // Presence, as the rest of the app understands it: the user still counts as
-// online while they're inside the reconnect grace window. This intentionally
-// matches Object.keys(userSocketMap) — the exact list broadcastOnlineUsers
-// sends out — because a helper that disagreed with the broadcast would report
-// someone offline while every client still showed them online.
+// online while they're inside the reconnect grace window. This is the global
+// truth (is this user connected at all) that call-signaling routes off — it is
+// deliberately NOT the same as what any one client sees, since presence is now
+// fanned out per-friend rather than as one shared list.
 export function isUserOnline(userId) {
   return Boolean(userSocketMap[userId]);
 }
@@ -129,7 +155,7 @@ io.on("connection", (socket) => {
   console.log("A user connected", socket.user.fullName);
 
   const userId = socket.userId;
-  markOnline(userId, socket.id);
+  const wasOffline = markOnline(userId, socket.id);
 
   // A stable per-user room lets REST endpoints (e.g. creating/adding to a
   // group) push this socket into new group rooms without needing a reconnect,
@@ -144,10 +170,22 @@ io.on("connection", (socket) => {
     })
     .catch((err) => console.log("Error joining group rooms:", err.message));
 
-  // Send the current snapshot straight to the newly-connected client too,
-  // not just to everyone else — otherwise a freshly opened tab has to wait
-  // for someone else's connect/disconnect event before it knows who's online.
-  socket.emit("getOnlineUsers", onlineUserIds());
+  // Presence bootstrap + fan-out, friends-only. This socket is told which of
+  // ITS friends are online right now (so a freshly opened tab doesn't have to
+  // wait for someone else's event), and the user's friends are told this user
+  // just came online — but only on a real offline->online transition, so a
+  // second tab doesn't spam a redundant notice.
+  friendIdsOf(userId)
+    .then((friends) => {
+      const onlineFriends = friends.filter((fid) => isUserOnline(fid));
+      socket.emit("getOnlineUsers", onlineFriends);
+      if (wasOffline) {
+        friends.forEach((fid) =>
+          io.to(`user:${fid}`).emit("presenceUpdate", { userId: String(userId), online: true })
+        );
+      }
+    })
+    .catch(() => socket.emit("getOnlineUsers", []));
 
   // with socket.on we listen for events from clients
   socket.on("typing", ({ receiverId }) => {

@@ -77,3 +77,32 @@ export function createOTPEmailTemplate(name, otp) {
   </html>
   `;
 }
+
+export function createPasswordResetEmailTemplate(name, otp) {
+  return `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset your Havn password</title>
+  </head>
+  <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #3A332B; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #FAF7F2;">
+    <div style="background-color: #C2410C; padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+      <div style="color: #FFF7ED; font-size: 20px; font-weight: 700; letter-spacing: 1px; margin-bottom: 8px;">Havn</div>
+      <h1 style="color: #FFFFFF; margin: 0; font-size: 24px; font-weight: 600;">Reset your password</h1>
+    </div>
+    <div style="background-color: #ffffff; padding: 35px; border-radius: 0 0 12px 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center;">
+      <p style="font-size: 18px; color: #C2410C;"><strong>Hello ${name},</strong></p>
+      <p>Use the code below to reset your Havn password. It expires in 10 minutes.</p>
+
+      <div style="background-color: #F0EAE1; padding: 20px; border-radius: 10px; margin: 25px 0; display: inline-block;">
+        <span style="font-size: 32px; letter-spacing: 8px; font-weight: 700; color: #3A332B;">${otp}</span>
+      </div>
+
+      <p style="color: #A59989; font-size: 13px;">If you didn't request a password reset, you can safely ignore this email — your password won't change.</p>
+    </div>
+  </body>
+  </html>
+  `;
+}

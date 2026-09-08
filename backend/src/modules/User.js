@@ -70,6 +70,22 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    // Password-reset code. Deliberately separate from the otp/* fields above so
+    // a "forgot password" request and a pending signup verification can't
+    // overwrite each other's code — the two flows can legitimately overlap.
+    resetOtp: {
+        type: String,
+    },
+    resetOtpExpiry: {
+        type: Date,
+    },
+    resetOtpLastSentAt: {
+        type: Date,
+    },
+    resetOtpAttempts: {
+        type: Number,
+        default: 0,
+    },
     // Brute-force protection for login: after too many wrong passwords in a
     // row, the account is temporarily locked regardless of IP, so a
     // password-spraying attacker can't just rotate IPs to dodge the

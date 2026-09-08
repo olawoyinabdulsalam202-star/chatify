@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import FriendRequest from "../modules/FriendRequest.js";
 import User from "../modules/User.js";
-import { io, getReceiverSocketId } from "../lib/socket.js";
+import { io, getReceiverSocketId, isUserOnline } from "../lib/socket.js";
 import { PUBLIC_USER_FIELDS, shapeLastSeen } from "../lib/publicFields.js";
 
 // Escapes the one regex-special character a handle can legally contain (a dot)
@@ -33,7 +33,13 @@ export const searchUsers = async (req, res) => {
     const raw = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
     if (raw.length < 2) return res.status(200).json([]);
 
-    const prefix = new RegExp("^" + escapeRegex(raw));
+    // The `i` flag matters: usernames are stored lowercase for accounts created
+    // since the schema's lowercase setter, but legacy/backfilled accounts can
+    // still hold mixed case ("Elite_dev"). Without it, a lowercased query prefix
+    // never matches a capitalised stored handle — a real account that shows up
+    // as "no accounts match". Case-insensitive is also simply correct: handles
+    // are case-insensitive identities.
+    const prefix = new RegExp("^" + escapeRegex(raw), "i");
     const users = await User.find({
       username: prefix,
       _id: { $ne: req.user._id },
@@ -74,7 +80,15 @@ export const addFriendByUsername = async (req, res) => {
 
     // Only public fields — this document is sent straight back to the client to
     // open the chat with, so it must not carry email/otp/etc.
-    const target = await User.findOne({ username: raw }).select(PUBLIC_USER_FIELDS);
+    //
+    // Anchored case-insensitive match rather than a bare equality on `raw`: a
+    // legacy/backfilled account stored as "Elite_dev" would never match the
+    // lowercased "elite_dev", which is the exact reason a real, existing contact
+    // returned "no account with that username" and had to be re-added. Handles
+    // are case-insensitive, so this is the correct lookup everywhere.
+    const target = await User.findOne({
+      username: new RegExp("^" + escapeRegex(raw) + "$", "i"),
+    }).select(PUBLIC_USER_FIELDS);
     if (!target || target.isBot || target.isSystem) {
       return res.status(404).json({ message: "No account with that username" });
     }
@@ -101,6 +115,21 @@ export const addFriendByUsername = async (req, res) => {
           },
         });
       }
+
+      // Presence is friends-only now, so neither side was ever told about the
+      // other's online state before this moment. Sync it both ways immediately
+      // so a freshly-added friend who's already online shows a green dot without
+      // waiting for a reload or their next reconnect.
+      if (isUserOnline(target._id.toString())) {
+        io.to(`user:${me}`).emit("presenceUpdate", {
+          userId: target._id.toString(),
+          online: true,
+        });
+      }
+      io.to(`user:${target._id}`).emit("presenceUpdate", {
+        userId: me.toString(),
+        online: true,
+      });
     }
 
     // Shaped so the last-seen reciprocity rule still applies to the object the
