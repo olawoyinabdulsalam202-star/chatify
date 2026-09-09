@@ -4,6 +4,12 @@ export const ENV = {
   PORT: process.env.PORT || 3000,
   MONGO_URI: process.env.MONGO_URI,
   JWT_SECRET: process.env.JWT_SECRET,
+  // Cookie Domain attribute. Set to ".kairos-va.com" once frontend, admin, and
+  // API share that root, so the session cookie is first-party across every
+  // subdomain. Leave UNSET when they don't share a root (e.g. *.vercel.app +
+  // *.onrender.com) — a Domain that doesn't match silently drops the cookie
+  // instead of just failing to help.
+  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN,
   NODE_ENV: process.env.NODE_ENV,
   CLIENT_URL: process.env.CLIENT_URL,
   // Every browser origin allowed to call the API and open a socket. CLIENT_URL
