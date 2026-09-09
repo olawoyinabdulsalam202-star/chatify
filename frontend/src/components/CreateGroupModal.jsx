@@ -71,12 +71,12 @@ function CreateGroupModal({ onClose }) {
                       type="checkbox"
                       checked={selectedIds.includes(c._id)}
                       onChange={() => toggleMember(c._id)}
-                      className="checkbox checkbox-sm checkbox-primary"
+                      className="checkbox checkbox-sm checkbox-primary shrink-0"
                     />
-                    <img src={c.profilePic || "/avatar.svg"} alt={c.fullName} className="w-8 h-8 rounded-full" />
-                    <span className="text-slate-200 text-sm flex items-center gap-1">
-                      {c.fullName}
-                      {c.isBadged && <VerifiedBadge className="w-3.5 h-3.5" />}
+                    <img src={c.profilePic || "/avatar.svg"} alt={c.fullName} className="w-8 h-8 rounded-full shrink-0" />
+                    <span className="text-slate-200 text-sm flex items-center gap-1 min-w-0">
+                      <span className="truncate">{c.fullName}</span>
+                      {c.isBadged && <VerifiedBadge className="w-3.5 h-3.5 shrink-0" />}
                     </span>
                   </label>
                 ))

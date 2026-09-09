@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { VolumeOffIcon, Volume2Icon, SettingsIcon, ShieldIcon, UserPlusIcon } from "lucide-react";
+import { VolumeOffIcon, Volume2Icon, SettingsIcon, UserPlusIcon } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { Link } from "react-router";
@@ -78,13 +78,6 @@ function ProfileHeader() {
           >
             <UserPlusIcon className="size-5" />
           </button>
-
-          {/* ADMIN BTN */}
-          {authUser.isAdmin && (
-            <Link to="/admin" className="text-slate-400 hover:text-cyan-400 transition-colors" title="Admin dashboard">
-              <ShieldIcon className="size-5" />
-            </Link>
-          )}
 
           {/* SETTINGS BTN */}
           <Link to="/settings" className="text-slate-400 hover:text-slate-200 transition-colors">

@@ -98,12 +98,12 @@ function GroupInfoModal({ onClose }) {
         className="bg-slate-800 border border-slate-700 rounded-lg w-full max-w-md max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-slate-700/50">
-          <h3 className="text-slate-100 font-medium truncate flex items-center gap-1">
-            {group.name}
-            {group.creatorIsBadged && <VerifiedBadge className="w-4 h-4" />}
+        <div className="flex items-center justify-between gap-2 p-4 border-b border-slate-700/50">
+          <h3 className="text-slate-100 font-medium flex items-center gap-1 min-w-0">
+            <span className="truncate">{group.name}</span>
+            {group.creatorIsBadged && <VerifiedBadge className="w-4 h-4 shrink-0" />}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-200">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-200 shrink-0">
             <XIcon className="w-5 h-5" />
           </button>
         </div>
@@ -113,17 +113,17 @@ function GroupInfoModal({ onClose }) {
         )}
 
         {group.type !== "channel" && (
-          <div className="flex items-center justify-between mx-4 mt-3 p-3 bg-slate-900/50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <BotIcon className="w-4 h-4 text-cyan-400" />
-              <div>
+          <div className="flex items-center justify-between gap-3 mx-4 mt-3 p-3 bg-slate-900/50 rounded-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <BotIcon className="w-4 h-4 text-cyan-400 shrink-0" />
+              <div className="min-w-0">
                 <p className="text-sm text-slate-200">AI assistant</p>
                 <p className="text-xs text-slate-500">Let members @-mention the bot in this group</p>
               </div>
             </div>
             <input
               type="checkbox"
-              className="toggle toggle-sm toggle-success"
+              className="toggle toggle-sm toggle-success shrink-0"
               checked={group.botEnabled !== false}
               disabled={!isAdmin}
               onChange={(e) => updateGroup(group._id, { botEnabled: e.target.checked })}

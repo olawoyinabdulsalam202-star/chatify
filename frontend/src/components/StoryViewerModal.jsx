@@ -163,15 +163,15 @@ function StoryViewerModal() {
           ))}
         </div>
 
-        <div className="absolute top-6 left-3 right-3 z-10 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <img src={author?.profilePic || "/avatar.svg"} alt={author?.fullName} className="size-8 rounded-full object-cover" />
-            <span className="text-white text-sm font-medium flex items-center gap-1">
-              {author?.fullName}
-              {author?.isBadged && <VerifiedBadge className="w-3.5 h-3.5" />}
+        <div className="absolute top-6 left-3 right-3 z-10 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <img src={author?.profilePic || "/avatar.svg"} alt={author?.fullName} className="size-8 rounded-full object-cover shrink-0" />
+            <span className="text-white text-sm font-medium flex items-center gap-1 min-w-0">
+              <span className="truncate">{author?.fullName}</span>
+              {author?.isBadged && <VerifiedBadge className="w-3.5 h-3.5 shrink-0" />}
             </span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             {isMine && !story.image && !story.video && (
               <button
                 onClick={() => {

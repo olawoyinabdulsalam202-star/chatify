@@ -49,34 +49,34 @@ function ChatHeader() {
   }, [menuOpen]);
 
   return (
-    <div className="flex justify-between items-center bg-slate-800/50 border-b border-slate-700/50 max-h-[84px] px-6 flex-1">
-      <div className="flex items-center space-x-3">
+    <div className="flex justify-between items-center gap-2 bg-slate-800/50 border-b border-slate-700/50 max-h-[84px] px-4 sm:px-6 flex-1">
+      <div className="flex items-center space-x-3 min-w-0 flex-1">
         {/* Back arrow on mobile only */}
-        <button className="md:hidden mr-1" onClick={() => setSelectedUser(null)}>
+        <button className="md:hidden mr-1 shrink-0" onClick={() => setSelectedUser(null)}>
           <ArrowLeftIcon className="w-5 h-5 text-slate-400 hover:text-slate-200 transition-colors" />
         </button>
 
-        <div className={`avatar ${isOnline ? "online" : "offline"}`}>
+        <div className={`avatar shrink-0 ${isOnline ? "online" : "offline"}`}>
           <div className="w-12 rounded-full">
             <img src={selectedUser.profilePic || "/avatar.svg"} alt={selectedUser.fullName} />
           </div>
         </div>
 
-        <div>
-          <h3 className="text-slate-200 font-medium flex items-center gap-1">
-            {selectedUser.fullName}
-            {selectedUser.isBadged && <VerifiedBadge className="w-3.5 h-3.5" />}
+        <div className="min-w-0">
+          <h3 className="text-slate-200 font-medium flex items-center gap-1 min-w-0">
+            <span className="truncate">{selectedUser.fullName}</span>
+            {selectedUser.isBadged && <VerifiedBadge className="w-3.5 h-3.5 shrink-0" />}
           </h3>
-          <p className={`text-sm ${isOnline ? "text-emerald-400" : "text-slate-400"}`}>{presence}</p>
+          <p className={`text-sm truncate ${isOnline ? "text-emerald-400" : "text-slate-400"}`}>{presence}</p>
           {selectedUser.settings?.awayMessage && (
-            <p className="text-slate-500 text-xs italic mt-0.5">
+            <p className="text-slate-500 text-xs italic mt-0.5 truncate">
               {selectedUser.settings.awayMessage}
             </p>
           )}
         </div>
       </div>
 
-      <div className="relative" ref={menuRef}>
+      <div className="relative shrink-0" ref={menuRef}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
           className={`text-slate-400 hover:text-slate-200 transition-colors ${menuOpen ? "text-slate-200" : ""}`}
