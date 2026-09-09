@@ -9,7 +9,6 @@ import SettingsPage from "./pages/SettingsPage";
 import OtpVerifyPage from "./pages/OtpVerifyPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
-import AdminDashboardPage from "./pages/AdminDashboardPage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useCallStore } from "./store/useCallStore";
 import { useEffect } from "react";
@@ -134,17 +133,12 @@ function App() {
           path="/settings/:section"
           element={authUser ? <SettingsPage /> : <Navigate to={"/login"} />}
         />
-
-        <Route
-          path="/admin"
-          element={authUser?.isAdmin ? <AdminDashboardPage /> : <Navigate to={"/"} />}
-        />
       </Routes>
 
       {/* Call UI lives at the app root, not inside ChatPage. A call can arrive
-          while the user is on Settings or the admin dashboard, and mounting
-          these per-route meant the socket event fired with nothing rendered to
-          answer it — the call was simply invisible and silent on those pages. */}
+          while the user is on Settings, and mounting these per-route meant the
+          socket event fired with nothing rendered to answer it — the call was
+          simply invisible and silent on that page. */}
       {authUser && callState === "ringing" && <IncomingCallModal />}
       {authUser && (callState === "calling" || callState === "active") && <CallScreen />}
 

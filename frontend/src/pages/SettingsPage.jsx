@@ -379,7 +379,7 @@ function SettingsPage() {
       {/* FONT SIZE */}
       <div>
         <label className="block text-sm font-medium mb-2">Font size</label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {FONT_SIZES.map((f) => (
             <button
               type="button"

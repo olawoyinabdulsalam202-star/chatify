@@ -57,11 +57,11 @@ function ForwardModal({ message, onClose }) {
               <img
                 src={person.profilePic || "/avatar.svg"}
                 alt={person.fullName}
-                className="w-9 h-9 rounded-full object-cover"
+                className="w-9 h-9 rounded-full object-cover shrink-0"
               />
-              <span className="text-slate-200 text-sm flex items-center gap-1">
-                {person.fullName}
-                {person.isBadged && <VerifiedBadge className="w-3.5 h-3.5" />}
+              <span className="text-slate-200 text-sm flex items-center gap-1 min-w-0">
+                <span className="truncate">{person.fullName}</span>
+                {person.isBadged && <VerifiedBadge className="w-3.5 h-3.5 shrink-0" />}
               </span>
             </button>
           ))}
