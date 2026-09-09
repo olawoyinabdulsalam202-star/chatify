@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import { ENV } from "./env.js";
 
+const { COOKIE_DOMAIN } = ENV;
+
 // The cookie options that define this app's session, in one place.
 //
 // A cookie can only be cleared by a Set-Cookie whose attributes MATCH the ones
@@ -13,6 +15,12 @@ export const AUTH_COOKIE_OPTIONS = {
   httpOnly: true,   // never readable from JS, so XSS can't steal the session
   sameSite: "none", // frontend and API are different sites
   secure: true,     // required by browsers whenever sameSite is "none"
+  // Only add Domain when COOKIE_DOMAIN is set (frontend/admin/API share a root,
+  // e.g. ".kairos-va.com") so the cookie is first-party across subdomains. Unset
+  // => omit Domain: a host-only cookie, correct when the hosts don't share a
+  // root. This must live on the shared object so login's set and logout's clear
+  // carry the same Domain, per the invariant above.
+  ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
 };
 
 export const AUTH_COOKIE_NAME = "jwt";
