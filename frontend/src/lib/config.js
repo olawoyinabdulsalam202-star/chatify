@@ -20,3 +20,9 @@ export const BACKEND_URL = (
 // REST and the socket must always agree on the host — deriving both from the
 // same constant is what keeps them from drifting apart again.
 export const API_URL = `${BACKEND_URL}/api`;
+
+// Surfaced in Settings -> About: true when VITE_BACKEND_URL was set at build
+// time, false when the fallback above is in use. A production build reading
+// "false" means the Vercel env var is missing and the live app is silently
+// talking to the fallback backend.
+export const BACKEND_URL_CONFIGURED = Boolean(configured);

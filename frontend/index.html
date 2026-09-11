@@ -15,26 +15,99 @@
     <meta name="apple-mobile-web-app-title" content="Havn" />
 
     <title>Havn — a calmer place to talk</title>
-    <meta name="description" content="Havn is a private, calm messaging app. Send messages, voice notes, photos, and calls without the noise." />
-    <meta name="keywords" content="havn, private chat, messaging app, secure chat, voice notes, calls" />
-    <meta name="robots" content="index, follow" />
+    <meta name="description" content="Havn is a private, calm messaging app. Send messages, voice notes, photos, and one-to-one calls — no ads, no tracking, no noise." />
+    <meta name="keywords" content="havn, private messaging app, secure chat, voice notes, video calls, no ads messaging, private chat app" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="author" content="Havn" />
+    <link rel="canonical" href="https://havn.kairos-va.com/" />
 
     <!-- Open Graph / link previews -->
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Havn" />
+    <meta property="og:url" content="https://havn.kairos-va.com/" />
     <meta property="og:title" content="Havn — a calmer place to talk" />
-    <meta property="og:description" content="A private, calm messaging app. Messages, voice notes, photos, and calls without the noise." />
-    <meta property="og:image" content="/icon.svg" />
+    <meta property="og:description" content="A private, calm messaging app. Messages, voice notes, photos, and one-to-one calls — no ads, no tracking, no noise." />
+    <meta property="og:image" content="https://havn.kairos-va.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Havn — a calmer place to talk" />
+    <meta property="og:locale" content="en_US" />
 
     <!-- Twitter -->
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Havn — a calmer place to talk" />
-    <meta name="twitter:description" content="A private, calm messaging app. Messages, voice notes, photos, and calls without the noise." />
-    <meta name="twitter:image" content="/icon.svg" />
+    <meta name="twitter:description" content="A private, calm messaging app. Messages, voice notes, photos, and one-to-one calls — no ads, no tracking, no noise." />
+    <meta name="twitter:image" content="https://havn.kairos-va.com/og-image.png" />
 
     <!-- PWA -->
     <meta name="theme-color" content="#141311" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icon.svg" />
+
+    <!-- Structured data: describes Havn to search engines and generative/AI
+         engines. Kept in sync with the visible FAQ on the landing page. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://havn.kairos-va.com/#website",
+            "url": "https://havn.kairos-va.com/",
+            "name": "Havn",
+            "description": "A private, calm messaging app — messages, voice notes, photos, and calls without the noise.",
+            "publisher": { "@id": "https://havn.kairos-va.com/#organization" },
+            "inLanguage": "en"
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://havn.kairos-va.com/#organization",
+            "name": "Havn",
+            "url": "https://havn.kairos-va.com/",
+            "logo": "https://havn.kairos-va.com/og-image.png"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "name": "Havn",
+            "url": "https://havn.kairos-va.com/",
+            "applicationCategory": "CommunicationApplication",
+            "operatingSystem": "Web, Android, iOS",
+            "description": "Havn is a private, calm messaging app. Send messages, voice notes, photos, and one-to-one voice and video calls, and create groups and channels — with no ads and no tracking.",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Is Havn free to use?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Yes. Havn is free to use, with no ads and no paid tier required to message, call, or share." }
+              },
+              {
+                "@type": "Question",
+                "name": "Is Havn private?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Yes. Havn is private by default — your messages stay between you and the people you're talking to, and your data is never sold or mined." }
+              },
+              {
+                "@type": "Question",
+                "name": "What can I do on Havn?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Send text messages and voice notes, share photos and video including view-once, make one-to-one voice and video calls, and create groups and channels." }
+              },
+              {
+                "@type": "Question",
+                "name": "Does Havn show ads or track me?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. Havn has no ads and no tracking. It is not funded by advertising and does not build a profile of you." }
+              },
+              {
+                "@type": "Question",
+                "name": "What devices does Havn work on?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Havn runs in any modern web browser and can be installed as an app on Android and iOS from your home screen." }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -44,6 +117,32 @@
     />
   </head>
   <body>
+    <!-- Real content for crawlers and AI engines that don't run JavaScript.
+         Browsers with JS never see this; React renders into #root instead. -->
+    <noscript>
+      <div style="max-width:640px;margin:0 auto;padding:40px 20px;font-family:system-ui,sans-serif;line-height:1.6;color:#141311">
+        <h1>Havn — a calmer place to talk</h1>
+        <p>
+          Havn is a private, calm messaging app. Keep your conversations with friends, family, and
+          colleagues in one quiet place — messages, voice notes, photos, and one-to-one voice and
+          video calls, without the noise.
+        </p>
+        <h2>Features</h2>
+        <ul>
+          <li><strong>Private by default</strong> — your messages stay between you and the people you're talking to. Nothing sold, nothing mined.</li>
+          <li><strong>Voice notes</strong> — record and send in a single tap.</li>
+          <li><strong>Photos &amp; video</strong> — share in full quality, or send as view-once.</li>
+          <li><strong>Voice &amp; video calls</strong> — crisp one-to-one calls inside the conversation.</li>
+          <li><strong>Groups &amp; channels</strong> — keep friends, family, or a whole team in one place.</li>
+          <li><strong>No noise</strong> — no ads, no algorithm, no endless pings.</li>
+        </ul>
+        <p>
+          Havn works in any modern browser and installs as an app on Android and iOS. It is free to
+          use, with no ads and no tracking.
+        </p>
+        <p><a href="/signup">Get started</a> or <a href="/login">sign in</a>.</p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

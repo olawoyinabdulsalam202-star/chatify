@@ -16,6 +16,7 @@ import {
   Play,
   Send,
   CheckCheck,
+  ChevronDown,
 } from "lucide-react";
 
 const FEATURES = [
@@ -64,6 +65,31 @@ const STEPS = [
 ];
 
 const WAVE = [9, 15, 22, 13, 26, 18, 11, 24, 19, 10, 16, 23, 12, 18, 9];
+
+// Kept textually in sync with the FAQPage JSON-LD in index.html — Google only
+// shows FAQ rich results when the marked-up answers are visible on the page.
+const FAQS = [
+  {
+    q: "Is Havn free to use?",
+    a: "Yes. Havn is free to use, with no ads and no paid tier required to message, call, or share.",
+  },
+  {
+    q: "Is Havn private?",
+    a: "Yes. Havn is private by default — your messages stay between you and the people you're talking to, and your data is never sold or mined.",
+  },
+  {
+    q: "What can I do on Havn?",
+    a: "Send text messages and voice notes, share photos and video including view-once, make one-to-one voice and video calls, and create groups and channels.",
+  },
+  {
+    q: "Does Havn show ads or track me?",
+    a: "No. Havn has no ads and no tracking. It is not funded by advertising and does not build a profile of you.",
+  },
+  {
+    q: "What devices does Havn work on?",
+    a: "Havn runs in any modern web browser and can be installed as an app on Android and iOS from your home screen.",
+  },
+];
 
 function ChatMock() {
   return (
@@ -270,6 +296,36 @@ function LandingPage() {
               <p className="mt-2 text-sm leading-relaxed text-[#57534E]">{desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section id="faq" className="border-t border-[#E7DFD4] bg-[#F3EDE4]">
+        <div className="mx-auto max-w-3xl px-6 py-16 lg:py-24">
+          <div className="max-w-2xl">
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#C2410C]">
+              Questions
+            </span>
+            <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              Frequently asked.
+            </h2>
+          </div>
+          <div className="mt-10 space-y-3">
+            {FAQS.map(({ q, a }) => (
+              <details
+                key={q}
+                className="group rounded-2xl border border-[#E0D7CB] bg-[#FAF7F2] px-6 py-5"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display text-lg font-semibold">
+                  {q}
+                  <ChevronDown
+                    aria-hidden
+                    className="size-5 shrink-0 text-[#C2410C] transition-transform group-open:rotate-180"
+                  />
+                </summary>
+                <p className="mt-3 leading-relaxed text-[#57534E]">{a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 
