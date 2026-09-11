@@ -20,6 +20,8 @@ import {
   disablePushNotifications,
   notificationPermission,
 } from "../lib/push";
+import { BACKEND_URL, BACKEND_URL_CONFIGURED } from "../lib/config";
+import { axiosInstance } from "../lib/axios";
 
 // Compiled in by vite.config.js's `define`; "dev" when running unbuilt so the
 // About screen still renders. Shown so QA can match the live site to a commit.
@@ -89,6 +91,9 @@ function SettingsPage() {
   // "default" | "granted" | "denied" | "unsupported"
   const [pushState, setPushState] = useState(() => notificationPermission());
   const [pushBusy, setPushBusy] = useState(false);
+  // Live backend diagnostics for the About screen. null until fetched, then one
+  // of { loading }, { enabled, hasKey }, or { error }.
+  const [pushDiag, setPushDiag] = useState(null);
 
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
@@ -178,6 +183,28 @@ function SettingsPage() {
       document.documentElement.style.setProperty("--user-font-family", getFontStack(savedFont));
     };
   }, []);
+
+  // Hit /push/config only when the About screen is actually open, so a stale
+  // backend or an unconfigured push server is visible rather than guessed at.
+  useEffect(() => {
+    if (section !== "help") return;
+    let cancelled = false;
+    setPushDiag({ loading: true });
+    axiosInstance
+      .get("/push/config")
+      .then(({ data }) => {
+        if (!cancelled) setPushDiag({ enabled: !!data?.enabled, hasKey: !!data?.publicKey });
+      })
+      .catch((error) => {
+        if (!cancelled)
+          setPushDiag({
+            error: error.response?.data?.message || error.message || "Request failed",
+          });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section]);
 
   // Each sub-page saves only its own slice. The server merges via dot-notation,
   // so leaving a field out never wipes the others.
@@ -514,6 +541,39 @@ function SettingsPage() {
           build {COMMIT_HASH} · {BUILT_AT}
         </p>
       </div>
+
+      <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+        <p className="text-sm text-slate-200 font-medium mb-2">Diagnostics</p>
+        <div className="space-y-1.5 text-[11px] font-mono break-all">
+          <p className="text-slate-500">
+            <span className="text-slate-400">backend </span>
+            {BACKEND_URL}
+          </p>
+          <p>
+            <span className="text-slate-400">source </span>
+            <span className={BACKEND_URL_CONFIGURED ? "text-emerald-400" : "text-amber-400"}>
+              {BACKEND_URL_CONFIGURED ? "VITE_BACKEND_URL" : "fallback (env not set)"}
+            </span>
+          </p>
+          <p>
+            <span className="text-slate-400">push/config </span>
+            {!pushDiag || pushDiag.loading ? (
+              <span className="text-slate-500">checking…</span>
+            ) : pushDiag.error ? (
+              <span className="text-red-400">{pushDiag.error}</span>
+            ) : (
+              <span
+                className={
+                  pushDiag.enabled && pushDiag.hasKey ? "text-emerald-400" : "text-amber-400"
+                }
+              >
+                enabled={String(pushDiag.enabled)} · key={pushDiag.hasKey ? "present" : "missing"}
+              </span>
+            )}
+          </p>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden divide-y divide-slate-700/50">
         <button
           type="button"
