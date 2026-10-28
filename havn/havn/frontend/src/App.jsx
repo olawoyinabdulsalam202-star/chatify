@@ -1,0 +1,174 @@
+import { Navigate, Route, Routes, useLocation } from "react-router";
+import ChatPage from "./pages/ChatPage";
+import LandingPage from "./pages/LandingPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsPage from "./pages/TermsPage";
+import LoginPage from "./pages/LoginPage";
+import SignUpPage from "./pages/SignUpPage";
+import SettingsPage from "./pages/SettingsPage";
+import OtpVerifyPage from "./pages/OtpVerifyPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import { useAuthStore } from "./store/useAuthStore";
+import { useChatStore } from "./store/useChatStore";
+import { useGroupStore } from "./store/useGroupStore";
+import { useCallStore } from "./store/useCallStore";
+import { useEffect } from "react";
+import PageLoader from "./components/PageLoader";
+import IncomingCallModal from "./components/IncomingCallModal";
+import CallScreen from "./components/CallScreen";
+import InstallPrompt from "./components/InstallPrompt";
+import UpdatePrompt from "./components/UpdatePrompt";
+import NotificationPermissionBanner from "./components/NotificationPermissionBanner";
+import { loadFont, getFontStack } from "./lib/fonts";
+
+import { Toaster } from "react-hot-toast";
+
+function App() {
+  const { checkAuth, isCheckingAuth, authUser, pendingVerificationEmail } = useAuthStore();
+  const { callState, subscribeToCallEvents, unsubscribeFromCallEvents } = useCallStore();
+  const selectedUser = useChatStore((state) => state.selectedUser);
+  const selectedGroup = useGroupStore((state) => state.selectedGroup);
+  const location = useLocation();
+
+  // Full-bleed public pages run edge-to-edge with their own scroll instead of the
+  // centred app shell: the logged-out landing page, plus the legal pages, which
+  // stay full-bleed for logged-in and logged-out visitors alike.
+  const isFullBleed =
+    location.pathname === "/privacy" ||
+    location.pathname === "/terms" ||
+    (!authUser && location.pathname === "/");
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // Call signalling is subscribed here rather than on ChatPage so it survives
+  // navigation. It re-runs when authUser changes because the socket only exists
+  // once logged in, and logout replaces it — subscribing against a null or
+  // stale socket would silently never receive an incoming call.
+  useEffect(() => {
+    if (!authUser) return;
+    subscribeToCallEvents();
+    return () => unsubscribeFromCallEvents();
+  }, [authUser, subscribeToCallEvents, unsubscribeFromCallEvents]);
+
+  // Apply the user's saved theme/font preferences to the whole document —
+  // this is what actually makes the Settings page take effect.
+  useEffect(() => {
+    const settings = authUser?.settings;
+
+    document.documentElement.setAttribute("data-theme", settings?.theme || "dark");
+
+    // Fetch the chosen family (no-op for system fonts and for one already
+    // loaded), then point the app's font variable at its stack. getFontStack
+    // only ever returns a stack for a family in the catalogue, so an unknown or
+    // tampered stored value degrades to the default instead of reaching CSS.
+    const fontId = settings?.fontFamily || "sans";
+    loadFont(fontId);
+    document.documentElement.style.setProperty("--user-font-family", getFontStack(fontId));
+
+    if (settings?.fontColor) {
+      document.documentElement.style.setProperty("--user-font-color", settings.fontColor);
+    } else {
+      document.documentElement.style.removeProperty("--user-font-color");
+    }
+  }, [authUser]);
+
+  // A visible Havn tab should only suppress a push for the conversation the
+  // user is actually reading, not for messages arriving in another chat.
+  useEffect(() => {
+    const context = selectedUser
+      ? { kind: "dm", id: selectedUser._id }
+      : selectedGroup
+      ? { kind: "group", id: selectedGroup._id }
+      : null;
+    const message = { type: "ACTIVE_CONTEXT", context };
+    navigator.serviceWorker?.controller?.postMessage(message);
+    navigator.serviceWorker?.ready.then((registration) => registration.active?.postMessage(message)).catch(() => {});
+  }, [selectedUser, selectedGroup]);
+
+  // The safe-area inset padding lives on <body>, so its background is what fills
+  // the notch and home-indicator gaps. The landing and legal pages are always
+  // the light brand ground whatever the theme, while the app shell follows the
+  // theme — tag the body per route so those insets never show a mismatched bar.
+  useEffect(() => {
+    document.body.dataset.fullbleed = isFullBleed ? "true" : "false";
+  }, [isFullBleed]);
+
+  if (isCheckingAuth) return <PageLoader />;
+
+  return (
+    <div
+      className={
+        isFullBleed
+          ? `min-h-[100dvh] overflow-x-hidden font-size-${authUser?.settings?.fontSize || "medium"}`
+          : `min-h-[100dvh] bg-slate-900 relative flex items-center justify-center p-2 sm:p-4 overflow-x-hidden font-size-${
+              authUser?.settings?.fontSize || "medium"
+            }`
+      }
+    >
+      <Routes>
+        <Route path="/" element={authUser ? <ChatPage /> : <LandingPage />} />
+
+        {/* Public marketing/legal pages — reachable whether or not you're signed in. */}
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route
+          path="/login"
+          element={
+            authUser ? (
+              <Navigate to={"/"} />
+            ) : pendingVerificationEmail ? (
+              <OtpVerifyPage />
+            ) : (
+              <LoginPage />
+            )
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            authUser ? (
+              <Navigate to={"/"} />
+            ) : pendingVerificationEmail ? (
+              <OtpVerifyPage />
+            ) : (
+              <SignUpPage />
+            )
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={authUser ? <Navigate to={"/"} /> : <ForgotPasswordPage />}
+        />
+        <Route
+          path="/reset-password"
+          element={authUser ? <Navigate to={"/"} /> : <ResetPasswordPage />}
+        />
+        <Route path="/settings" element={authUser ? <SettingsPage /> : <Navigate to={"/login"} />} />
+        <Route
+          path="/settings/:section"
+          element={authUser ? <SettingsPage /> : <Navigate to={"/login"} />}
+        />
+      </Routes>
+
+      {/* Call UI lives at the app root, not inside ChatPage. A call can arrive
+          while the user is on Settings, and mounting these per-route meant the
+          socket event fired with nothing rendered to answer it — the call was
+          simply invisible and silent on that page. */}
+      {authUser && callState === "ringing" && <IncomingCallModal />}
+      {authUser && (callState === "calling" || callState === "active") && <CallScreen />}
+
+      {/* Outside the auth check: someone stuck on an old build may be sitting on
+          the login screen, and that's exactly who needs the offer most. */}
+      <UpdatePrompt />
+
+      <InstallPrompt />
+      {authUser && <NotificationPermissionBanner userId={authUser._id} />}
+
+      <Toaster />
+    </div>
+  );
+}
+export default App;

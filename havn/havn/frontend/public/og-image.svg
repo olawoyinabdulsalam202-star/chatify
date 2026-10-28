@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Havn — a calmer place to talk">
+  <rect width="1200" height="630" fill="#FAF7F2"/>
+  <rect width="1200" height="14" fill="#C2410C"/>
+
+  <text x="90" y="150" font-family="'Space Grotesk', Arial, sans-serif" font-size="60" font-weight="700" fill="#141311">Havn</text>
+
+  <text x="88" y="300" font-family="'Space Grotesk', Arial, sans-serif" font-size="76" font-weight="700" fill="#141311">A <tspan fill="#C2410C">calmer</tspan> place</text>
+  <text x="88" y="392" font-family="'Space Grotesk', Arial, sans-serif" font-size="76" font-weight="700" fill="#141311">to talk.</text>
+
+  <text x="90" y="470" font-family="Arial, sans-serif" font-size="30" fill="#57534E">Private messaging — no ads, no tracking, no noise.</text>
+
+  <text x="90" y="556" font-family="Arial, sans-serif" font-size="26" font-weight="700" fill="#C2410C">havn.kairos-va.com</text>
+
+  <g transform="translate(800,150)">
+    <rect x="0" y="0" width="300" height="80" rx="22" fill="#272320"/>
+    <rect x="60" y="110" width="300" height="80" rx="22" fill="#C2410C"/>
+    <rect x="0" y="220" width="230" height="80" rx="22" fill="#272320"/>
+  </g>
+</svg>

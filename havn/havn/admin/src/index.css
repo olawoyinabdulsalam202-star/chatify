@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   HAVN ADMIN THEME
+   ------------------------------------------------------------
+   Same variable-driven palette as the main app (see the
+   frontend's index.css for the full rationale). The admin app
+   ships dark-only, so only the dark ramp is declared here.
+   slate = warm neutral grays; cyan = terracotta accent (#C2410C).
+   Values are bare "R G B" channels so Tailwind opacity modifiers
+   (bg-slate-800/50) keep working.
+   ============================================================ */
+
+:root,
+[data-theme="dark"] {
+  --c-slate-50: 245 242 237;
+  --c-slate-100: 236 231 224;
+  --c-slate-200: 222 215 205;
+  --c-slate-300: 198 189 177;
+  --c-slate-400: 156 146 134;
+  --c-slate-500: 120 110 100;
+  --c-slate-600: 90 82 72;
+  --c-slate-700: 60 54 47;
+  --c-slate-800: 39 35 30;
+  --c-slate-900: 20 19 17;
+  --c-slate-950: 13 12 10;
+
+  --c-cyan-50: 255 247 237;
+  --c-cyan-100: 255 237 219;
+  --c-cyan-200: 252 213 178;
+  --c-cyan-300: 247 179 128;
+  --c-cyan-400: 237 137 74;
+  --c-cyan-500: 194 65 12;
+  --c-cyan-600: 168 56 14;
+  --c-cyan-700: 138 47 15;
+  --c-cyan-800: 110 38 15;
+  --c-cyan-900: 82 30 14;
+  --c-cyan-950: 48 18 9;
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: rgb(var(--c-slate-900));
+  color: rgb(var(--c-slate-200));
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+}
+
+.input {
+  @apply w-full bg-slate-800/50 border border-slate-700 rounded-lg py-2 px-4 text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-cyan-500 focus:border-transparent outline-none;
+}
