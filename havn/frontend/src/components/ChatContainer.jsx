@@ -21,9 +21,10 @@ import {
   EyeIcon,
   EyeOffIcon,
   XIcon,
-  PlayIcon,
-  VideoIcon,
   DownloadIcon,
+  UserPlusIcon,
+  BanIcon,
+  FlagIcon,
 } from "lucide-react";
 import ViewOnceViewer from "./ViewOnceViewer";
 import ViewOnceBubble from "./ViewOnceBubble";
@@ -31,6 +32,8 @@ import AudioBubble from "./AudioBubble";
 import { useStickerStore } from "../store/useStickerStore";
 import { getFontStack, loadFont } from "../lib/fonts";
 import { getDownloadUrl } from "../lib/downloadMedia";
+import { useFriendStore } from "../store/useFriendStore";
+import MessageMedia from "./MessageMedia";
 
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
@@ -57,6 +60,7 @@ function ChatContainer() {
     viewOnceCache,
   } = useChatStore();
   const { authUser } = useAuthStore();
+  const { addByUsername, blockUser, reportUser } = useFriendStore();
   const selectedUserId = selectedUser?._id;
   const saveSticker = useStickerStore((s) => s.saveSticker);
   const messageEndRef = useRef(null);
@@ -83,6 +87,20 @@ function ChatContainer() {
   const [fullMedia, setFullMedia] = useState(null);
   // { imageUrl, videoUrl, duration } while a view-once item is open fullscreen.
   const [viewOnceMedia, setViewOnceMedia] = useState(null);
+
+  const handleAddContact = async () => {
+    const connected = await addByUsername(selectedUser.username);
+    if (connected) useChatStore.getState().setSelectedUser({ ...selectedUser, ...connected, isFriend: true });
+  };
+
+  const handleBlock = async () => {
+    if (await blockUser(selectedUser._id)) useChatStore.getState().setSelectedUser(null);
+  };
+
+  const handleReport = async () => {
+    const reason = window.prompt("Why are you reporting this user?");
+    if (reason?.trim()) await reportUser(selectedUser._id, reason.trim());
+  };
 
   const downloadMedia = () => {
     const link = document.createElement("a");
@@ -189,6 +207,14 @@ function ChatContainer() {
   return (
     <>
       <ChatHeader />
+      {selectedUser.isFriend === false && (
+        <div className="shrink-0 flex items-center gap-3 border-b border-slate-800 bg-slate-900 px-4 py-2 text-xs text-slate-400">
+          <span className="flex-1">Not in your contacts</span>
+          <button onClick={handleBlock} className="flex items-center gap-1 hover:text-red-300"><BanIcon className="size-3.5" /> Block</button>
+          <button onClick={handleReport} className="flex items-center gap-1 hover:text-amber-300"><FlagIcon className="size-3.5" /> Report</button>
+          <button onClick={handleAddContact} className="flex items-center gap-1 text-cyan-300 hover:text-cyan-200"><UserPlusIcon className="size-3.5" /> Add</button>
+        </div>
+      )}
       <div
         ref={scrollContainerRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-6 sm:px-6 sm:py-8"
@@ -203,10 +229,11 @@ function ChatContainer() {
             {messages.map((msg) => {
               const isMine = msg.senderId === authUser._id;
               const reactionGroups = groupReactions(msg.reactions);
-              // Caption-less media (image, video, gif, sticker) drops its bubble so
-              // it reads edge-to-edge, like WhatsApp. View-once and audio keep theirs.
+              // Photo and video messages use a compact media bubble; other media keeps its existing layout.
+              const hasPhotoVideo = Boolean((msg.image || msg.video) && !msg.viewOnce && !msg.isDeleted);
               const isMediaOnly =
-                (msg.image || msg.video || msg.gif || msg.sticker) &&
+                (msg.gif || msg.sticker) &&
+                !hasPhotoVideo &&
                 !msg.text &&
                 !msg.isDeleted &&
                 !msg.viewOnce;
@@ -234,7 +261,9 @@ function ChatContainer() {
                     onTouchEnd={() => clearTimeout(longPressRef.current.timer)}
                     onTouchMove={() => clearTimeout(longPressRef.current.timer)}
                     className={`chat-bubble relative group max-w-[82%] sm:max-w-[75%] ${
-                      isMediaOnly
+                      hasPhotoVideo
+                        ? `${isMine ? "bg-cyan-500 text-white" : "bg-slate-800 text-slate-200"} p-1`
+                        : isMediaOnly
                         ? "bg-transparent p-0 text-slate-200"
                         : isMine
                         ? "bg-cyan-500 text-white"
@@ -333,50 +362,26 @@ function ChatContainer() {
                           </div>
                         )}
 
-                        {msg.image && !msg.viewOnce && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFullMedia({ type: "image", url: msg.image });
-                            }}
-                            className="block"
-                          >
-                            <img 
-                              src={msg.image}
-                              alt="Shared"
-                              className="rounded-lg h-48 object-cover max-w-full"
-                            />
-                          </button>
+                        {hasPhotoVideo && (
+                          <MessageMedia
+                            image={msg.image}
+                            video={msg.video}
+                            caption={msg.text}
+                            fontFamily={msg.senderFontFamily}
+                            createdAt={msg.createdAt}
+                            edited={msg.isEdited && !msg.isDeleted}
+                            ticks={isMine ? <MessageTicks status={msg.status} /> : null}
+                            onOpen={(type, url) => setFullMedia({ type, url })}
+                            captionContent={editingId === msg._id ? (
+                              <form onSubmit={(e) => submitEdit(e, msg._id)} onClick={(e) => e.stopPropagation()} className="flex gap-2">
+                                <input autoFocus value={editText} onChange={(e) => setEditText(e.target.value)} className="min-w-0 flex-1 rounded bg-slate-900/60 px-2 py-1 text-sm outline-none" />
+                                <button type="submit" className="text-xs text-cyan-300">Save</button>
+                                <button type="button" onClick={() => setEditingId(null)} className="text-xs text-slate-400">Cancel</button>
+                              </form>
+                            ) : null}
+                          />
                         )}
-                        {msg.video && !msg.viewOnce && (
-                          // Tapping opens fullscreen, same as a photo. The
-                          // inline element has no `controls` on purpose: a
-                          // control bar would swallow the tap, so the thumbnail
-                          // is a poster with a play badge and all playback
-                          // happens in the fullscreen viewer.
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFullMedia({ type: "video", url: msg.video });
-                            }}
-                            className="block relative rounded-lg overflow-hidden"
-                          >
-                            <video 
-                              src={msg.video}
-                              playsInline
-                              muted
-                              preload="metadata"
-                              className="rounded-lg max-h-64 max-w-full pointer-events-none"
-                            />
-                            <span className="absolute inset-0 flex items-center justify-center bg-black/25">
-                              <span className="size-12 rounded-full bg-black/60 flex items-center justify-center">
-                                <PlayIcon className="w-6 h-6 text-white ml-0.5" />
-                              </span>
-                            </span>
-                          </button>
-                        )}
+
                         {msg.viewOnce && (
                           <ViewOnceBubble
                             msg={msg}
@@ -396,7 +401,7 @@ function ChatContainer() {
                           <AudioBubble src={msg.audio} duration={msg.audioDuration} isMine={isMine} />
                         )}
 
-                        {editingId === msg._id ? (
+                        {!hasPhotoVideo && editingId === msg._id ? (
                           <form
                             onSubmit={(e) => submitEdit(e, msg._id)}
                             onClick={(e) => e.stopPropagation()}
@@ -420,19 +425,19 @@ function ChatContainer() {
                             </button>
                           </form>
                         ) : (
-                          msg.text && <p style={{ fontFamily: getFontStack(msg.senderFontFamily) }} className="mt-2 break-words">{msg.text}</p>
+                          !hasPhotoVideo && msg.text && <p style={{ fontFamily: getFontStack(msg.senderFontFamily) }} className="mt-2 break-words">{msg.text}</p>
                         )}
                       </>
                     )}
 
-                    <p className="text-xs mt-1 opacity-75 flex items-center gap-1">
+                    {!hasPhotoVideo && <p className="text-xs mt-1 opacity-75 flex items-center gap-1">
                       {new Date(msg.createdAt).toLocaleTimeString(undefined, {
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
                       {msg.isEdited && !msg.isDeleted && <span className="italic">· edited</span>}
                       {isMine && !msg.isDeleted && <MessageTicks status={msg.status} />}
-                    </p>
+                    </p>}
 
                     {Object.keys(reactionGroups).length > 0 && (
                       <div

@@ -114,6 +114,17 @@ export const useChatStore = create((set, get) => ({
     if (fresh) set({ selectedUser: { ...selected, ...fresh } });
   },
 
+  markFriendAdded: (user) => {
+    if (!user?._id) return;
+    const id = String(user._id);
+    set({
+      chats: get().chats.map((chat) => chat._id === id ? { ...chat, isFriend: true, isRequest: false } : chat),
+      selectedUser: get().selectedUser?._id === id
+        ? { ...get().selectedUser, ...user, isFriend: true, isRequest: false }
+        : get().selectedUser,
+    });
+  },
+
   // `quiet` skips the loading flag. The socket handler refreshes this list on
   // every incoming message, and without quiet mode that would flash the
   // loading skeleton over the sidebar each time a message arrived.
@@ -440,6 +451,22 @@ export const useChatStore = create((set, get) => ({
         // until you reloaded or switched tabs. This fetch means they appear
         // instantly the way WhatsApp does.
         get().getMyChatPartners({ quiet: true });
+      },
+      friendAdded: ({ by }) => get().markFriendAdded(by),
+      messageDelivered: ({ messageId, by }) => {
+        if (by && String(by) !== String(get().selectedUser?._id)) return;
+        set({ messages: get().messages.map((message) =>
+          message._id === messageId && message.status !== "seen"
+            ? { ...message, status: "delivered" }
+            : message
+        ) });
+      },
+      friendRemoved: ({ userId }) => {
+        const id = String(userId);
+        set({
+          chats: get().chats.map((chat) => chat._id === id ? { ...chat, isFriend: false } : chat),
+          selectedUser: get().selectedUser?._id === id ? { ...get().selectedUser, isFriend: false } : get().selectedUser,
+        });
       },
     };
 

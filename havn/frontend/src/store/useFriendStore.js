@@ -46,7 +46,7 @@ export const useFriendStore = create((set, get) => ({
       if (!get().friends.includes(user._id)) {
         set({ friends: [...get().friends, user._id] });
       }
-      return user;
+      return { ...user, isFriend: true, isRequest: false };
     } catch (error) {
       toast.error(error.response?.data?.message || "Couldn't add that user");
       return null;
@@ -63,6 +63,28 @@ export const useFriendStore = create((set, get) => ({
     }
   },
 
+  blockUser: async (userId) => {
+    try {
+      await axiosInstance.post(`/friends/block/${userId}`);
+      set({ friends: get().friends.filter((id) => id !== userId) });
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Couldn't block this user");
+      return false;
+    }
+  },
+
+  reportUser: async (userId, reason) => {
+    try {
+      const response = await axiosInstance.post(`/messages/report/${userId}`, { reason });
+      toast.success(response.data.message || "Report submitted");
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Couldn't submit the report");
+      return false;
+    }
+  },
+
   subscribeToFriendEvents: () => {
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
@@ -74,8 +96,11 @@ export const useFriendStore = create((set, get) => ({
         if (!get().friends.includes(by._id)) {
           set({ friends: [...get().friends, by._id] });
         }
-        toast.success(`@${by.username} added you`);
+        useChatStore.getState().markFriendAdded(by);
         useChatStore.getState().getMyChatPartners({ quiet: true });
+      },
+      friendRemoved: ({ userId }) => {
+        set({ friends: get().friends.filter((id) => id !== userId) });
       },
     };
 

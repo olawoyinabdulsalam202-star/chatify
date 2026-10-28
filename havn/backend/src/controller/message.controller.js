@@ -1,6 +1,8 @@
 import cloudinary from "../lib/cloudinary.js";
-import { getReceiverSocketId, io } from "../lib/socket.js";
+import mongoose from "mongoose";
+import { getReceiverSocketId, hasLiveSocket, io, syncPresenceForUsers } from "../lib/socket.js";
 import Message from "../modules/Message.js";
+import MessageReport from "../modules/MessageReport.js";
 import User from "../modules/User.js";
 import Group from "../modules/Group.js";
 import { getBotUserId } from "../lib/bot.js";
@@ -28,9 +30,15 @@ export const getMessagesByUserId = async (req, res) => {
   try {
     const myId = req.user._id;
     const { id: userToChatId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userToChatId)) return res.status(400).json({ message: "Invalid user id." });
 
-    if (!req.user.friends.some((f) => f.equals(userToChatId))) {
-      return res.status(403).json({ message: "You can only message people you've added. Add them by their username first." });
+    const [target, me] = await Promise.all([
+      User.findById(userToChatId).select("blockedUsers"),
+      User.findById(myId).select("blockedUsers"),
+    ]);
+    if (!target) return res.status(404).json({ message: "User not found." });
+    if (target.blockedUsers?.some((id) => id.equals(myId)) || me?.blockedUsers?.some((id) => id.equals(userToChatId))) {
+      return res.status(403).json({ message: "You cannot message this user because one of you has blocked the other." });
     }
 
     const messages = await Message.find({
@@ -66,10 +74,7 @@ export const sendMessage = async (req, res) => {
       req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
-
-    if (!req.user.friends.some((f) => f.equals(receiverId))) {
-      return res.status(403).json({ message: "You can only message people you've added. Add them by their username first." });
-    }
+    if (!mongoose.Types.ObjectId.isValid(receiverId)) return res.status(400).json({ message: "Invalid user id." });
 
     if (!text && !image && !video && !gif && !sticker && !audio) {
       return res.status(400).json({ message: "Text, image, video, gif, sticker, or audio is required." });
@@ -81,9 +86,84 @@ export const sendMessage = async (req, res) => {
     if (senderId.equals(receiverId)) {
       return res.status(400).json({ message: "Cannot send messages to yourself." });
     }
-    const receiverExists = await User.exists({ _id: receiverId });
-    if (!receiverExists) {
+    const [sender, receiver] = await Promise.all([
+      User.findById(senderId).select("friends blockedUsers settings fullName username profilePic"),
+      User.findById(receiverId).select("friends blockedUsers username fullName profilePic"),
+    ]);
+    if (!receiver) {
       return res.status(404).json({ message: "Receiver not found." });
+    }
+    if (sender?.blockedUsers?.some((id) => id.equals(receiverId)) || receiver.blockedUsers?.some((id) => id.equals(senderId))) {
+      return res.status(403).json({ message: "You cannot message this user because one of you has blocked the other." });
+    }
+
+    const senderIsFriend = sender?.friends?.some((id) => id.equals(receiverId)) || false;
+    const receiverIsFriend = receiver.friends?.some((id) => id.equals(senderId)) || false;
+    let isFriend = senderIsFriend || receiverIsFriend;
+    if (isFriend && (!senderIsFriend || !receiverIsFriend)) {
+      await Promise.all([
+        User.updateOne({ _id: senderId }, { $addToSet: { friends: receiverId } }),
+        User.updateOne({ _id: receiverId }, { $addToSet: { friends: senderId } }),
+      ]);
+      io.to(`user:${senderId}`).emit("friendAdded", { by: { _id: receiver._id, username: receiver.username, fullName: receiver.fullName, profilePic: receiver.profilePic } });
+      io.to(`user:${receiverId}`).emit("friendAdded", { by: { _id: sender._id, username: sender.username, fullName: sender.fullName, profilePic: sender.profilePic } });
+      await syncPresenceForUsers(senderId, receiverId);
+    }
+
+    const priorConversation = await Message.exists({
+      groupId: { $exists: false },
+      $or: [
+        { senderId, receiverId },
+        { senderId: receiverId, receiverId: senderId },
+      ],
+    });
+    const priorReply = await Message.exists({ senderId: receiverId, receiverId: senderId });
+    if (!isFriend && !priorReply) {
+      const priorOutboundCount = await Message.countDocuments({
+        senderId,
+        receiverId,
+        groupId: { $exists: false },
+      });
+      if (priorOutboundCount >= 5) {
+        return res.status(429).json({ message: "You can send up to 5 messages until this person replies." });
+      }
+      if (!priorConversation) {
+        const dayStart = new Date();
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const startedToday = await Message.aggregate([
+          { $match: { groupId: { $exists: false }, receiverId: { $exists: true }, $or: [{ senderId }, { receiverId: senderId }] } },
+          { $sort: { createdAt: 1 } },
+          { $group: {
+            _id: { $cond: [{ $eq: ["$senderId", senderId] }, "$receiverId", "$senderId"] },
+            firstAt: { $first: "$createdAt" },
+            firstSender: { $first: "$senderId" },
+          } },
+          { $match: { firstSender: senderId, firstAt: { $gte: dayStart } } },
+        ]);
+        const contactedIds = startedToday.map((entry) => entry._id).filter(Boolean);
+        const initiatedUsers = contactedIds.length
+          ? await User.find({ _id: { $in: contactedIds } }).select("friends")
+          : [];
+        const friendIds = new Set((sender.friends || []).map(String));
+        initiatedUsers.forEach((user) => {
+          if (user.friends?.some((id) => id.equals(senderId))) friendIds.add(String(user._id));
+        });
+        const nonFriendStarts = contactedIds.filter((id) => !friendIds.has(String(id)));
+        if (nonFriendStarts.length >= 20) {
+          return res.status(429).json({ message: "You can start up to 20 new conversations per day." });
+        }
+      }
+    }
+
+    if (!isFriend && priorReply) {
+      await Promise.all([
+        User.updateOne({ _id: senderId }, { $addToSet: { friends: receiverId } }),
+        User.updateOne({ _id: receiverId }, { $addToSet: { friends: senderId } }),
+      ]);
+      isFriend = true;
+      io.to(`user:${senderId}`).emit("friendAdded", { by: { _id: receiver._id } });
+      io.to(`user:${receiverId}`).emit("friendAdded", { by: { _id: sender._id, username: sender.username, fullName: sender.fullName, profilePic: sender.profilePic } });
+      await syncPresenceForUsers(senderId, receiverId);
     }
 
     let imageUrl;
@@ -168,7 +248,9 @@ export const sendMessage = async (req, res) => {
       viewOnceIsVideo: !!(viewOnce && videoUrl),
     });
 
+    if (hasLiveSocket(receiverId)) newMessage.status = "delivered";
     await newMessage.save();
+    await syncPresenceForUsers(senderId, receiverId);
 
     const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
@@ -183,6 +265,7 @@ export const sendMessage = async (req, res) => {
       } else {
         io.to(`user:${receiverId}`).emit("newMessage", newMessage);
       }
+      io.to(`user:${senderId}`).emit("messageDelivered", { messageId: newMessage._id, by: receiverId });
     }
 
     // Push to the recipient's devices so a closed app still notifies. Sent
@@ -498,7 +581,7 @@ export const getChatPartners = async (req, res) => {
       _id: { $in: chatPartnerIds },
       isBot: { $ne: true },
       isSystem: { $ne: true },
-    }).select(PUBLIC_USER_FIELDS);
+    }).select(`${PUBLIC_USER_FIELDS} friends`);
 
     // $in returns documents in arbitrary order, so restore the recency order
     // computed above. Bots/system users filtered out by the query just fall out
@@ -507,11 +590,58 @@ export const getChatPartners = async (req, res) => {
     const partnerById = new Map(chatPartners.map((u) => [u._id.toString(), u]));
     const orderedPartners = chatPartnerIds
       .map((id) => partnerById.get(id))
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((partner) => {
+        const partnerId = partner._id.toString();
+        const pair = messages.filter((message) =>
+          String(message.senderId) === partnerId || String(message.receiverId) === partnerId
+        );
+        const isFriend = Boolean(
+          req.user.friends.some((id) => id.equals(partner._id)) ||
+          partner.friends?.some((id) => id.equals(loggedInUserId))
+        );
+        const isRequest = !isFriend && pair.some((message) => String(message.senderId) === partnerId) &&
+          !pair.some((message) => String(message.senderId) === String(loggedInUserId));
+        const shaped = partner.toObject();
+        delete shaped.friends;
+        return { ...shaped, isFriend, isRequest };
+      });
 
     res.status(200).json(shapeLastSeenMany(orderedPartners, req.user));
   } catch (error) {
     console.error("Error in getChatPartners: ", error.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const reportUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(userId)) return res.status(400).json({ message: "Invalid user id." });
+    const reason = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
+    if (!reason) return res.status(400).json({ message: "Enter a reason for the report." });
+    if (reason.length > 500) return res.status(400).json({ message: "Report reason must be 500 characters or fewer." });
+    if (String(req.user._id) === String(userId)) return res.status(400).json({ message: "You cannot report yourself." });
+    const reportedUser = await User.exists({ _id: userId });
+    if (!reportedUser) return res.status(404).json({ message: "User not found." });
+
+    const recentMessages = await Message.find({
+      groupId: { $exists: false },
+      $or: [
+        { senderId: req.user._id, receiverId: userId },
+        { senderId: userId, receiverId: req.user._id },
+      ],
+    }).sort({ createdAt: -1 }).limit(5).select("_id");
+
+    await MessageReport.create({
+      reporter: req.user._id,
+      reported: userId,
+      reason,
+      messageIds: recentMessages.map((message) => message._id),
+    });
+    res.status(201).json({ message: "Report submitted." });
+  } catch (error) {
+    console.error("Error in reportUser:", error.message);
+    res.status(500).json({ message: "Couldn't submit the report." });
   }
 };

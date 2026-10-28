@@ -11,7 +11,6 @@ import {
   ReplyIcon,
   SmileIcon,
   BotIcon,
-  PlayIcon,
   StickerIcon,
   XIcon,
   DownloadIcon,
@@ -20,6 +19,7 @@ import VerifiedBadge from "./VerifiedBadge";
 import ViewOnceBubble from "./ViewOnceBubble";
 import ViewOnceViewer from "./ViewOnceViewer";
 import AudioBubble from "./AudioBubble";
+import MessageMedia from "./MessageMedia";
 import { useStickerStore } from "../store/useStickerStore";
 import { getFontStack, loadFont } from "../lib/fonts";
 import { getDownloadUrl } from "../lib/downloadMedia";
@@ -145,11 +145,11 @@ function GroupChatContainer() {
                 ? prevMsg.senderId._id || prevMsg.senderId
                 : null;
               const isFirstInRun = senderId !== prevSenderId;
-              // Caption-less media (image, video, gif, sticker) drops its bubble so
-              // it reads edge-to-edge, like WhatsApp. The per-run sender name still
-              // renders above it. View-once and audio keep their bubble.
+              // Photo and video messages use a compact media bubble; the sender name stays above it.
+              const hasPhotoVideo = Boolean((msg.image || msg.video) && !msg.viewOnce && !msg.isDeleted);
               const isMediaOnly =
-                (msg.image || msg.video || msg.gif || msg.sticker) &&
+                (msg.gif || msg.sticker) &&
+                !hasPhotoVideo &&
                 !msg.text &&
                 !msg.isDeleted &&
                 !msg.viewOnce;
@@ -194,7 +194,9 @@ function GroupChatContainer() {
                     onTouchEnd={() => clearTimeout(longPressRef.current.timer)}
                     onTouchMove={() => clearTimeout(longPressRef.current.timer)}
                     className={`chat-bubble relative max-w-[82%] sm:max-w-[75%] ${
-                      isMediaOnly
+                      hasPhotoVideo
+                        ? `${isMine ? "bg-cyan-500 text-white" : "bg-slate-800 text-slate-200"} p-1`
+                        : isMediaOnly
                         ? "bg-transparent p-0 text-slate-200"
                         : isMine
                         ? "bg-cyan-500 text-white"
@@ -218,48 +220,25 @@ function GroupChatContainer() {
                       <p className="text-sm">This message was deleted</p>
                     ) : (
                       <>
-                        {msg.text && <p style={{ fontFamily: getFontStack(msg.senderFontFamily) }} className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>}
-                        {msg.image && !msg.viewOnce && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFullMedia({ type: "image", url: msg.image });
-                            }}
-                            className="block mt-1"
-                          >
-                            <img 
-                              src={msg.image}
-                              alt="Shared"
-                              className="rounded-lg h-48 object-cover max-w-full"
-                            />
-                          </button>
-                        )}
-                        {msg.video && !msg.viewOnce && (
-                          // No inline `controls`: a control bar would swallow
-                          // the tap that opens the fullscreen viewer, so the
-                          // thumbnail is a muted poster with a play badge.
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setFullMedia({ type: "video", url: msg.video });
-                            }}
-                            className="block relative rounded-lg overflow-hidden mt-1"
-                          >
-                            <video 
-                              src={msg.video}
-                              playsInline
-                              muted
-                              preload="metadata"
-                              className="rounded-lg max-h-64 max-w-full pointer-events-none"
-                            />
-                            <span className="absolute inset-0 flex items-center justify-center bg-black/25">
-                              <span className="size-12 rounded-full bg-black/60 flex items-center justify-center">
-                                <PlayIcon className="w-6 h-6 text-white ml-0.5" />
-                              </span>
-                            </span>
-                          </button>
+                        {hasPhotoVideo ? (
+                          <MessageMedia
+                            image={msg.image}
+                            video={msg.video}
+                            caption={msg.text}
+                            fontFamily={msg.senderFontFamily}
+                            createdAt={msg.createdAt}
+                            edited={msg.isEdited && !msg.isDeleted}
+                            onOpen={(type, url) => setFullMedia({ type, url })}
+                            captionContent={editingId === msg._id ? (
+                              <div className="flex gap-2">
+                                <input value={editText} onChange={(e) => setEditText(e.target.value)} className="min-w-0 flex-1 rounded bg-slate-900/60 px-2 py-1 text-xs text-slate-200" autoFocus />
+                                <button onClick={() => { editGroupMessage(msg._id, editText); setEditingId(null); }} className="text-xs text-cyan-400">Save</button>
+                                <button onClick={() => setEditingId(null)} className="text-xs text-slate-500">Cancel</button>
+                              </div>
+                            ) : null}
+                          />
+                        ) : (
+                          msg.text && <p style={{ fontFamily: getFontStack(msg.senderFontFamily) }} className="text-sm whitespace-pre-wrap break-words">{msg.text}</p>
                         )}
                         {msg.viewOnce && (
                           <ViewOnceBubble
@@ -391,7 +370,7 @@ function GroupChatContainer() {
                     )}
                   </div>
 
-                  {editingId === msg._id && (
+                  {editingId === msg._id && !hasPhotoVideo && (
                     <div className="chat-footer flex items-center gap-2 mt-1">
                       <input
                         value={editText}

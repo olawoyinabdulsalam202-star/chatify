@@ -5,6 +5,7 @@ import { ENV } from "./env.js";
 import { socketAuthMiddleware } from "../middleware/socket.auth.middleware.js";
 import Group from "../modules/Group.js";
 import User from "../modules/User.js";
+import Message from "../modules/Message.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -59,10 +60,26 @@ export function onlineUserIds() {
 // Presence is friends-only. A user's online state is sent only to the people
 // they're mutually connected with — never io.emit'd to the whole connected
 // base, which used to leak every member's presence (and id) to everyone.
-async function friendIdsOf(userId) {
+export async function friendIdsOf(userId) {
   try {
-    const u = await User.findById(userId).select("friends");
-    return (u?.friends || []).map((f) => f.toString());
+    const u = await User.findById(userId).select("friends blockedUsers");
+    if (!u) return [];
+    const ids = new Set((u.friends || []).map(String));
+    const reciprocal = await User.find({ friends: userId }).select("_id");
+    reciprocal.forEach((user) => ids.add(String(user._id)));
+    const conversations = await Message.find({
+      groupId: { $exists: false },
+      $or: [{ senderId: userId }, { receiverId: userId }],
+    }).select("senderId receiverId").lean();
+    conversations.forEach((message) => {
+      const otherId = String(message.senderId) === String(userId) ? message.receiverId : message.senderId;
+      if (otherId) ids.add(String(otherId));
+    });
+    const candidates = [...ids].filter((id) => id !== String(userId));
+    const blocked = new Set((u.blockedUsers || []).map(String));
+    const blockers = await User.find({ _id: { $in: candidates }, blockedUsers: userId }).select("_id");
+    blockers.forEach((user) => blocked.add(String(user._id)));
+    return candidates.filter((id) => !blocked.has(id));
   } catch {
     return [];
   }
@@ -71,11 +88,18 @@ async function friendIdsOf(userId) {
 // Fan a presence change out to a user's friends, each in their own per-user
 // room. This is the targeted replacement for the old global broadcast: X's
 // friends are exactly the set allowed to know whether X is online.
-async function emitPresenceToFriends(userId, online) {
+export async function emitPresenceToFriends(userId, online) {
   const friends = await friendIdsOf(userId);
   friends.forEach((fid) => {
     io.to(`user:${fid}`).emit("presenceUpdate", { userId: String(userId), online });
   });
+}
+
+export async function syncPresenceForUsers(firstId, secondId) {
+  const firstOnline = isUserOnline(String(firstId));
+  const secondOnline = isUserOnline(String(secondId));
+  io.to(`user:${firstId}`).emit("presenceUpdate", { userId: String(secondId), online: secondOnline });
+  io.to(`user:${secondId}`).emit("presenceUpdate", { userId: String(firstId), online: firstOnline });
 }
 
 // Returns whether this was a genuine offline->online transition. The caller

@@ -133,27 +133,24 @@ function AddPeopleModal() {
                       {u.isBadged && <VerifiedBadge className="w-3.5 h-3.5" />}
                     </p>
                   </div>
-                  {u.isFriend ? (
+                  <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => openChatWith(u)}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-medium transition-colors"
+                      onClick={() => openChatWith({ ...u, isFriend: u.isFriend })}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-medium transition-colors"
                     >
                       <MessageCircleIcon className="w-3.5 h-3.5" /> Message
                     </button>
-                  ) : (
-                    <button
-                      onClick={() => handleAdd(u)}
-                      disabled={addingId === u._id}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
-                    >
-                      {addingId === u._id ? (
-                        <LoaderIcon className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <UserPlusIcon className="w-3.5 h-3.5" />
-                      )}
-                      Add
-                    </button>
-                  )}
+                    {!u.isFriend && (
+                      <button
+                        onClick={() => handleAdd(u)}
+                        disabled={addingId === u._id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                      >
+                        {addingId === u._id ? <LoaderIcon className="w-3.5 h-3.5 animate-spin" /> : <UserPlusIcon className="w-3.5 h-3.5" />}
+                        Add
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </>

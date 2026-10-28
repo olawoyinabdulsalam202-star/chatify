@@ -47,7 +47,7 @@ function ChatsList() {
                     onlineUsers.includes(chat._id) ? "text-emerald-400" : "text-slate-500"
                   }`}
                 >
-                  {presenceLabel({
+                  {chat.isRequest ? "Message request" : presenceLabel({
                     isOnline: onlineUsers.includes(chat._id),
                     lastSeenAt: chat.lastSeenAt,
                   })}

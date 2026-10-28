@@ -153,6 +153,7 @@ const userSchema = new mongoose.Schema({
     // Users can only DM each other once they're friends — set once a friend
     // request has been accepted (see FriendRequest model).
     friends: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    blockedUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     // Tracks whether the one-time welcome DM + auto-join to the official
     // Announcements channel has happened yet, so both can be safely
     // backfilled for accounts created before this feature existed.
