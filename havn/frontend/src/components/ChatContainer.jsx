@@ -38,9 +38,9 @@ import MessageMedia from "./MessageMedia";
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 
 function MessageTicks({ status }) {
-  if (status === "seen") return <CheckCheckIcon className="w-3.5 h-3.5 text-white" />;
-  if (status === "delivered") return <CheckCheckIcon className="w-3.5 h-3.5 opacity-70" />;
-  return <CheckIcon className="w-3.5 h-3.5 opacity-70" />;
+  if (status === "seen") return <CheckCheckIcon className="w-3.5 h-3.5 text-blue-300" />;
+  if (status === "delivered") return <CheckCheckIcon className="w-3.5 h-3.5 text-slate-300" />;
+  return <CheckIcon className="w-3.5 h-3.5 text-slate-300" />;
 }
 
 function ChatContainer() {

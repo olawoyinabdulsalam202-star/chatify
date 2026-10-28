@@ -104,6 +104,9 @@ const messageSchema = new mongoose.Schema(
       enum: ["sent", "delivered", "seen"],
       default: "sent",
     },
+    deliveredAt: {
+      type: Date,
+    },
     seenAt: {
       type: Date,
     },

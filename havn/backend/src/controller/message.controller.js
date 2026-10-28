@@ -248,8 +248,13 @@ export const sendMessage = async (req, res) => {
       viewOnceIsVideo: !!(viewOnce && videoUrl),
     });
 
-    if (hasLiveSocket(receiverId)) newMessage.status = "delivered";
     await newMessage.save();
+    const receiverOnline = hasLiveSocket(receiverId);
+    if (receiverOnline) {
+      newMessage.status = "delivered";
+      newMessage.deliveredAt = new Date();
+      await newMessage.save();
+    }
     await syncPresenceForUsers(senderId, receiverId);
 
     const receiverSocketId = getReceiverSocketId(receiverId);
@@ -265,7 +270,12 @@ export const sendMessage = async (req, res) => {
       } else {
         io.to(`user:${receiverId}`).emit("newMessage", newMessage);
       }
-      io.to(`user:${senderId}`).emit("messageDelivered", { messageId: newMessage._id, by: receiverId });
+      if (receiverOnline) {
+        io.to(`user:${senderId}`).emit("messageDelivered", {
+          messageId: newMessage._id,
+          receiverId: String(receiverId),
+        });
+      }
     }
 
     // Push to the recipient's devices so a closed app still notifies. Sent

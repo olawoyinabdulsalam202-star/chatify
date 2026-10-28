@@ -186,6 +186,34 @@ io.on("connection", (socket) => {
   // and lets us fan a message out to every device/tab a user has open.
   socket.join(`user:${userId}`);
 
+  Message.find({
+    receiverId: userId,
+    status: "sent",
+    groupId: { $exists: false },
+  }).select("_id senderId").lean()
+    .then(async (pendingMessages) => {
+      if (!pendingMessages.length) return;
+      const deliveredAt = new Date();
+      await Message.updateMany(
+        { _id: { $in: pendingMessages.map((message) => message._id) }, status: "sent" },
+        { $set: { status: "delivered", deliveredAt } }
+      );
+      const bySender = new Map();
+      pendingMessages.forEach((message) => {
+        const senderId = String(message.senderId);
+        bySender.set(senderId, [...(bySender.get(senderId) || []), message]);
+      });
+      bySender.forEach((messages, senderId) => {
+        messages.forEach((message) => {
+          io.to(`user:${senderId}`).emit("messageDelivered", {
+            messageId: String(message._id),
+            receiverId: String(userId),
+          });
+        });
+      });
+    })
+    .catch((error) => console.error("Error delivering pending messages:", error.message));
+
   // Join every group room this user already belongs to.
   Group.find({ "members.userId": userId })
     .select("_id")

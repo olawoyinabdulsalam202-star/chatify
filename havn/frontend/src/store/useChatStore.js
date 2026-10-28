@@ -420,9 +420,12 @@ export const useChatStore = create((set, get) => ({
         if (message.groupId) return; // handled by useGroupStore
 
         const { selectedUser, isSoundEnabled, unreadCounts } = get();
+        const authUserId = useAuthStore.getState().authUser?._id;
         const isFromSelectedUser = selectedUser?._id === message.senderId;
+        const isIncomingUnread =
+          String(message.receiverId) === String(authUserId) && message.status !== "seen";
 
-        if (!isFromSelectedUser) {
+        if (!isFromSelectedUser && isIncomingUnread) {
           // Bump unread count for this sender.
           const nextUnread = {
             ...unreadCounts,
@@ -453,10 +456,10 @@ export const useChatStore = create((set, get) => ({
         get().getMyChatPartners({ quiet: true });
       },
       friendAdded: ({ by }) => get().markFriendAdded(by),
-      messageDelivered: ({ messageId, by }) => {
-        if (by && String(by) !== String(get().selectedUser?._id)) return;
+      messageDelivered: ({ messageId, receiverId }) => {
+        if (!get().selectedUser || String(receiverId) !== String(get().selectedUser._id)) return;
         set({ messages: get().messages.map((message) =>
-          message._id === messageId && message.status !== "seen"
+          String(message._id) === String(messageId) && message.status !== "seen"
             ? { ...message, status: "delivered" }
             : message
         ) });
