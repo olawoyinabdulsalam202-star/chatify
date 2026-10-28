@@ -122,6 +122,11 @@ const messageSchema = new mongoose.Schema(
       senderId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       text: { type: String },
     },
+    storyReply: {
+      storyId: { type: mongoose.Schema.Types.ObjectId },
+      thumbnail: { type: String },
+      text: { type: String, maxlength: 300 },
+    },
     reactions: [
       {
         userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

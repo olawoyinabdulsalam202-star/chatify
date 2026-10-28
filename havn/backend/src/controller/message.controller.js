@@ -70,7 +70,7 @@ export const getMessagesByUserId = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, video, videoDuration, gif, sticker, replyToId, audio, audioDuration, viewOnce } =
+    const { text, image, video, videoDuration, gif, sticker, replyToId, storyReply: storyReplyInput, audio, audioDuration, viewOnce } =
       req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
@@ -230,6 +230,18 @@ export const sendMessage = async (req, res) => {
       }
     }
 
+    let storyReply;
+    if (storyReplyInput) {
+      if (!mongoose.Types.ObjectId.isValid(storyReplyInput.storyId)) {
+        return res.status(400).json({ message: "Invalid status reply." });
+      }
+      storyReply = {
+        storyId: storyReplyInput.storyId,
+        thumbnail: typeof storyReplyInput.thumbnail === "string" ? storyReplyInput.thumbnail.slice(0, 2000) : "",
+        text: typeof storyReplyInput.text === "string" ? storyReplyInput.text.trim().slice(0, 300) : "",
+      };
+    }
+
     const newMessage = new Message({
       senderId,
       receiverId,
@@ -244,6 +256,7 @@ export const sendMessage = async (req, res) => {
       audioDuration,
       expiresAt,
       replyTo,
+      storyReply,
       viewOnce: !!viewOnce,
       viewOnceIsVideo: !!(viewOnce && videoUrl),
     });
@@ -285,7 +298,7 @@ export const sendMessage = async (req, res) => {
     // a socket means "actually looking at it".
     sendPushToUser(receiverId, {
       title: req.user.fullName,
-      body: previewText(newMessage),
+      body: storyReply ? `Replied to your status: ${text}` : previewText(newMessage),
       tag: `dm-${senderId}`,
       url: `/?dm=${senderId}`,
       messageId: String(newMessage._id),

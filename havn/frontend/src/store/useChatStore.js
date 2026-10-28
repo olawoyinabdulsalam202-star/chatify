@@ -194,8 +194,11 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  sendMessage: async (messageData) => {
-    const { selectedUser, messages, replyTarget } = get();
+  sendMessage: async (messageData, receiverOverride) => {
+    const { selectedUser, messages, replyTarget: currentReplyTarget } = get();
+    const receiverId = receiverOverride || selectedUser?._id;
+    if (!receiverId) return null;
+    const replyTarget = selectedUser?._id === receiverId ? currentReplyTarget : null;
     const { authUser } = useAuthStore.getState();
 
     const tempId = nextTempId();
@@ -203,7 +206,7 @@ export const useChatStore = create((set, get) => ({
     const optimisticMessage = {
       _id: tempId,
       senderId: authUser._id,
-      receiverId: selectedUser._id,
+      receiverId,
       text: messageData.text,
       image: messageData.image,
       gif: messageData.gif,
@@ -223,32 +226,37 @@ export const useChatStore = create((set, get) => ({
                 (replyTarget.image ? "📷 Photo" : replyTarget.sticker ? "Sticker" : "GIF"),
           }
         : undefined,
+      storyReply: messageData.storyReply,
       isOptimistic: true, // flag to identify optimistic messages (optional)
     };
     // immidetaly update the ui by adding the message
-    set({ messages: [...messages, optimisticMessage], replyTarget: null });
+    if (selectedUser?._id === receiverId) set({ messages: [...messages, optimisticMessage], replyTarget: null });
 
     try {
-      const res = await axiosInstance.post(`/messages/send/${selectedUser._id}`, {
+      const res = await axiosInstance.post(`/messages/send/${receiverId}`, {
         ...messageData,
         replyToId: replyTarget?._id,
       });
       // Same idempotent reconcile as the group path. DMs are only echoed to the
       // receiver today, so the sender can't double up — but this makes the
       // reconcile correct on its own terms rather than by relying on that.
-      set({
-        messages: [
-          ...get().messages.filter((m) => m._id !== tempId && m._id !== res.data._id),
-          res.data,
-        ],
-      });
+      if (get().selectedUser?._id === receiverId) {
+        set({
+          messages: [
+            ...get().messages.filter((m) => m._id !== tempId && m._id !== res.data._id),
+            res.data,
+          ],
+        });
+      }
       // Bump this partner to the top of the sidebar the way receiving one does.
       // Quiet so the list re-sorts without flashing the loading skeleton.
       get().getMyChatPartners({ quiet: true });
+      return res.data;
     } catch (error) {
       // remove optimistic message on failure
-      set({ messages: get().messages.filter((m) => m._id !== tempId) });
+      if (selectedUser?._id === receiverId) set({ messages: get().messages.filter((m) => m._id !== tempId) });
       toast.error(error.response?.data?.message || "Something went wrong");
+      return null;
     }
   },
 

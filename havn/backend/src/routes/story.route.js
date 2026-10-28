@@ -6,6 +6,7 @@ import {
   getMyStories,
   viewStory,
   getStoryViewers,
+  likeStory,
   deleteStory,
 } from "../controller/story.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
@@ -21,6 +22,7 @@ router.get("/feed", getStoriesFeed);
 router.get("/mine", getMyStories);
 router.post("/:id/view", viewStory);
 router.get("/:id/viewers", getStoryViewers);
+router.post("/:id/like", likeStory);
 router.delete("/:id", deleteStory);
 
 export default router;

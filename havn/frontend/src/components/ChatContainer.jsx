@@ -356,6 +356,15 @@ function ChatContainer() {
                       <p className="italic opacity-60 text-sm">This message was deleted</p>
                     ) : (
                       <>
+                        {msg.storyReply && (
+                          <div className="mb-2 flex max-w-[260px] items-center gap-2 rounded-lg bg-black/15 p-2">
+                            {msg.storyReply.thumbnail && <img src={msg.storyReply.thumbnail} alt="" draggable={false} className="size-12 shrink-0 rounded-md object-cover" />}
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide opacity-70">Status</p>
+                              <p className="truncate text-xs opacity-80">{msg.storyReply.text || "Photo or video status"}</p>
+                            </div>
+                          </div>
+                        )}
                         {msg.replyTo && (
                           <div className="mb-2 pl-2 border-l-2 border-white/30 text-xs opacity-80 truncate max-w-[240px]">
                             {msg.replyTo.text}

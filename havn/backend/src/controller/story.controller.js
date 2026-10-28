@@ -1,6 +1,7 @@
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 import Story from "../modules/Story.js";
+import User from "../modules/User.js";
 
 export const createStory = async (req, res) => {
   try {
@@ -121,19 +122,20 @@ export const viewStory = async (req, res) => {
 
     const story = await Story.findById(id);
     if (!story) return res.status(404).json({ message: "Story not found or expired." });
-
-    const alreadyViewed = story.viewers.some((v) => v.userId.equals(viewerId));
-    if (!alreadyViewed && !story.userId.equals(viewerId)) {
-      story.viewers.push({ userId: viewerId });
-      await story.save();
-
+    if (!story.userId.equals(viewerId)) {
+      const result = await Story.updateOne(
+        { _id: id, "viewers.userId": { $ne: viewerId }, userId: { $ne: viewerId } },
+        { $push: { viewers: { userId: viewerId, viewedAt: new Date() } } }
+      );
+      if (result.modifiedCount === 1) {
       const authorSocketId = getReceiverSocketId(story.userId);
       if (authorSocketId) {
         io.to(authorSocketId).emit("storyViewed", { storyId: story._id, viewerId });
       }
+      }
     }
 
-    res.status(200).json(story);
+    res.status(200).json(await Story.findById(id));
   } catch (error) {
     console.log("Error in viewStory controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -143,14 +145,64 @@ export const viewStory = async (req, res) => {
 export const getStoryViewers = async (req, res) => {
   try {
     const { id } = req.params;
-    const story = await Story.findById(id).populate("viewers.userId", "fullName profilePic isBadged");
+    const story = await Story.findById(id)
+      .populate("viewers.userId", "fullName profilePic isBadged")
+      .populate("likes.userId", "_id");
     if (!story) return res.status(404).json({ message: "Story not found or expired." });
     if (!story.userId.equals(req.user._id)) {
       return res.status(403).json({ message: "Only the author can see viewers." });
     }
-    res.status(200).json(story.viewers);
+    const uniqueViewers = new Map();
+    story.viewers.forEach((viewer) => {
+      const user = viewer.userId;
+      if (!user) return;
+      const key = String(user._id);
+      const existing = uniqueViewers.get(key);
+      if (!existing || new Date(viewer.viewedAt) < new Date(existing.viewedAt)) {
+        uniqueViewers.set(key, { ...viewer.toObject(), liked: story.likes.some((like) => String(like.userId?._id) === key) });
+      }
+    });
+    res.status(200).json({ viewers: [...uniqueViewers.values()], viewCount: uniqueViewers.size, likeCount: new Set(story.likes.map((like) => String(like.userId?._id)).filter(Boolean)).size });
   } catch (error) {
     console.log("Error in getStoryViewers controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const likeStory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const story = await Story.findById(id);
+    if (!story) return res.status(404).json({ message: "Story not found or expired." });
+    if (story.userId.equals(userId)) return res.status(403).json({ message: "You cannot like your own status." });
+
+    const friendship = await User.exists({
+      $or: [
+        { _id: story.userId, friends: userId },
+        { _id: userId, friends: story.userId },
+      ],
+    });
+    if (!friendship) {
+      return res.status(403).json({ message: "Only the author's contacts can like this status." });
+    }
+
+    const alreadyLiked = story.likes.some((like) => like.userId.equals(userId));
+    let liked;
+    if (alreadyLiked) {
+      const result = await Story.updateOne({ _id: id, "likes.userId": userId }, { $pull: { likes: { userId } } });
+      liked = result.modifiedCount === 0;
+    } else {
+      const result = await Story.updateOne({ _id: id, "likes.userId": { $ne: userId } }, { $addToSet: { likes: { userId, likedAt: new Date() } } });
+      liked = result.modifiedCount === 1;
+      if (liked) io.to(`user:${story.userId}`).emit("storyLiked", { storyId: id, likerId: String(userId) });
+    }
+    const updated = await Story.findById(id).select("likes");
+    liked = updated.likes.some((like) => like.userId.equals(userId));
+    const likeCount = new Set(updated.likes.map((like) => String(like.userId))).size;
+    return res.status(200).json({ liked, likeCount });
+  } catch (error) {
+    console.log("Error in likeStory controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

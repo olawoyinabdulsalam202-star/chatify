@@ -2,8 +2,10 @@ import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
+import { useChatStore } from "./useChatStore";
 
 let storySocketHandlers = null;
+const viewedStoryIds = new Set();
 
 export const useStoryStore = create((set, get) => ({
   feed: [], // [{ user, stories: [...] }]
@@ -13,7 +15,10 @@ export const useStoryStore = create((set, get) => ({
 
   // Clears every per-account field on logout so the next user on this tab
   // never sees the previous user's story feed.
-  resetStoryState: () => set({ feed: [], myStories: [], viewerIndex: null, isLoading: false }),
+  resetStoryState: () => {
+    viewedStoryIds.clear();
+    set({ feed: [], myStories: [], viewerIndex: null, isLoading: false });
+  },
 
   getStoriesFeed: async () => {
     set({ isLoading: true });
@@ -61,11 +66,43 @@ export const useStoryStore = create((set, get) => ({
   },
 
   viewStory: async (storyId) => {
+    if (viewedStoryIds.has(String(storyId))) return;
+    viewedStoryIds.add(String(storyId));
     try {
-      await axiosInstance.post(`/stories/${storyId}/view`);
+      const res = await axiosInstance.post(`/stories/${storyId}/view`);
+      set({
+        feed: get().feed.map((group) => ({
+          ...group,
+          stories: group.stories.map((story) => story._id === storyId ? res.data : story),
+        })),
+      });
     } catch {
-      // non-critical — silently ignore
+      viewedStoryIds.delete(String(storyId));
     }
+  },
+
+  toggleStoryLike: async (storyId) => {
+    try {
+      const res = await axiosInstance.post(`/stories/${storyId}/like`);
+      const patchStory = (story) => story._id === storyId
+        ? { ...story, likes: res.data.liked
+          ? [...(story.likes || []).filter((like) => String(like.userId?._id || like.userId) !== String(useAuthStore.getState().authUser?._id)), { userId: useAuthStore.getState().authUser?._id, likedAt: new Date().toISOString() }]
+          : (story.likes || []).filter((like) => String(like.userId?._id || like.userId) !== String(useAuthStore.getState().authUser?._id)) }
+        : story;
+      set({
+        feed: get().feed.map((group) => ({ ...group, stories: group.stories.map(patchStory) })),
+        myStories: get().myStories.map(patchStory),
+      });
+      return res.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || "Couldn't update your like.");
+    }
+  },
+
+  sendStoryReply: async (receiverId, storyReply, text) => {
+    const sent = await useChatStore.getState().sendMessage({ text, storyReply }, receiverId);
+    if (!sent) throw new Error("Couldn't send your reply.");
+    return sent;
   },
 
   deleteStory: async (storyId) => {
@@ -84,7 +121,7 @@ export const useStoryStore = create((set, get) => ({
       return res.data;
     } catch (error) {
       toast.error(error.response?.data?.message || "Failed to load viewers");
-      return [];
+      return { viewers: [], viewCount: 0, likeCount: 0 };
     }
   },
 
@@ -114,6 +151,22 @@ export const useStoryStore = create((set, get) => ({
             stories: group.stories.map((s) => (s._id === story._id ? { ...s, ...story } : s)),
           })),
           myStories: get().myStories.map((s) => (s._id === story._id ? story : s)),
+        });
+      },
+      storyViewed: ({ storyId, viewerId }) => {
+        const addViewer = (story) => {
+          if (story._id !== storyId || story.viewers?.some((viewer) => String(viewer.userId?._id || viewer.userId) === String(viewerId))) return story;
+          return { ...story, viewers: [...(story.viewers || []), { userId: viewerId, viewedAt: new Date().toISOString() }] };
+        };
+        set({ myStories: get().myStories.map(addViewer) });
+      },
+      storyLiked: ({ storyId, likerId }) => {
+        const update = (story) => story._id !== storyId || story.likes?.some((like) => String(like.userId?._id || like.userId) === String(likerId))
+          ? story
+          : { ...story, likes: [...(story.likes || []), { userId: likerId, likedAt: new Date().toISOString() }] };
+        set({
+          myStories: get().myStories.map(update),
+          feed: get().feed.map((group) => ({ ...group, stories: group.stories.map(update) })),
         });
       },
     };
