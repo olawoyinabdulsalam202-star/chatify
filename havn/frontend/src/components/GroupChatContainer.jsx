@@ -120,7 +120,7 @@ function GroupChatContainer() {
 
       <div
         ref={scrollContainerRef}
-        className="flex-1 px-3 sm:px-6 overflow-y-auto py-6 sm:py-8"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-6 sm:px-6 sm:py-8"
         onScroll={(e) => {
           const el = e.currentTarget;
           nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;

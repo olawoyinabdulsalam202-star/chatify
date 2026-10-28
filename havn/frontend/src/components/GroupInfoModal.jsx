@@ -131,7 +131,7 @@ function GroupInfoModal({ onClose }) {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-1">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase text-slate-500 font-medium">
               {group.members.length} members
@@ -147,7 +147,7 @@ function GroupInfoModal({ onClose }) {
           </div>
 
           {showAddMembers && (
-            <div className="bg-slate-900/50 rounded-lg p-2 mb-2 space-y-1 max-h-40 overflow-y-auto">
+            <div className="min-h-0 bg-slate-900/50 rounded-lg p-2 mb-2 space-y-1 max-h-40 overflow-y-auto overscroll-contain">
               {addableContacts.length === 0 ? (
                 <p className="text-xs text-slate-500 px-2 py-1">No more contacts to invite.</p>
               ) : (

@@ -187,14 +187,14 @@ function GroupMessageInput() {
 
   if (!canPost) {
     return (
-      <div className="p-4 border-t border-slate-700/50 text-center text-sm text-slate-500">
+      <div className="shrink-0 p-4 border-t border-slate-700/50 text-center text-sm text-slate-500">
         Only admins can post in this channel.
       </div>
     );
   }
 
   return (
-    <div className="p-2 sm:p-4 border-t border-slate-700/50">
+    <div className="shrink-0 p-2 sm:p-4 border-t border-slate-700/50">
       {hasAttachment && (
         <div className="max-w-3xl mx-auto mb-3 flex items-center gap-3">
           <div className="relative shrink-0">

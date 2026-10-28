@@ -113,8 +113,7 @@ function ChatContainer() {
   // reaction, reconciling an optimistic send, or a background sidebar refresh
   // all re-run this effect with the same messages — scrolling on those (and with
   // "smooth", which restarts mid-animation) is what made the pane drift up and
-  // down. We also set scrollTop directly instead of scrollIntoView so it never
-  // nudges any ancestor scroll container.
+  // down. Setting scrollTop directly never nudges an ancestor scroll container.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -192,7 +191,7 @@ function ChatContainer() {
       <ChatHeader />
       <div
         ref={scrollContainerRef}
-        className="flex-1 px-3 sm:px-6 overflow-y-auto py-6 sm:py-8"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-6 sm:px-6 sm:py-8"
         onScroll={(e) => {
           const el = e.currentTarget;
           nearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;

@@ -44,7 +44,7 @@ function ForwardModal({ message, onClose }) {
             <XIcon className="w-5 h-5" />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {people.length === 0 && (
             <p className="text-sm text-slate-500 p-4">No contacts to forward to yet.</p>
           )}

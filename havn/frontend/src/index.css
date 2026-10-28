@@ -130,6 +130,10 @@ body {
   overscroll-behavior-y: none;
 }
 
+body[data-fullbleed="false"] {
+  overflow: hidden;
+}
+
 /* Keep the app clear of the notch and the home indicator. Paired with
    viewport-fit=cover in index.html — without that meta tag these insets are
    always 0 and iOS letterboxes the page instead. */

@@ -106,7 +106,7 @@ function AddPeopleModal() {
           </p>
         </div>
 
-        <div className="overflow-y-auto flex-1 p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
           {q.length >= 2 ? (
             <>
               {isSearching && (

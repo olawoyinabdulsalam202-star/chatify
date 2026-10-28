@@ -113,14 +113,14 @@ function ChatPage() {
   // mobile means the viewport with the URL bar hidden, which pushes the message
   // input off-screen until you scroll.
   return (
-    <div className="relative w-full max-w-6xl min-h-0 h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] md:h-[800px]">
+    <div className="relative w-full max-w-6xl min-h-0 h-full max-h-[920px]">
       <Panel>
         {/* LEFT SIDE - hidden on mobile when chat is open */}
         <div className={`relative ${showingChat ? "hidden md:flex" : "flex"} min-h-0 w-full md:w-80 bg-slate-800 flex-col`}>
-          <ProfileHeader />
-          <StoryTray />
-          <ActiveTabSwitch />
-          <div className="flex-1 overflow-y-auto p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] space-y-2">
+          <div className="shrink-0"><ProfileHeader /></div>
+          <div className="shrink-0"><StoryTray /></div>
+          <div className="shrink-0"><ActiveTabSwitch /></div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] space-y-2">
             {activeTab === "groups" ? (
               <GroupsList />
             ) : (

@@ -49,7 +49,7 @@ function ChatHeader() {
   }, [menuOpen]);
 
   return (
-    <div className="relative flex justify-between items-center gap-2 bg-slate-800/50 border-b border-slate-700/50 min-h-[72px] max-h-[84px] px-2 sm:px-6 flex-1">
+    <div className="relative flex shrink-0 justify-between items-center gap-2 bg-slate-800/50 border-b border-slate-700/50 min-h-[72px] max-h-[84px] px-2 sm:px-6">
       <div className="flex items-center space-x-3 min-w-0 flex-1">
         {/* Back arrow on mobile only */}
         <button className="md:hidden mr-1 shrink-0" onClick={() => setSelectedUser(null)}>

@@ -89,7 +89,7 @@ function AssistantChat() {
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-slate-900">
-      <header className="flex min-h-[72px] items-center justify-between gap-3 border-b border-slate-700/50 bg-slate-800/50 px-3 sm:px-6">
+      <header className="flex min-h-[72px] shrink-0 items-center justify-between gap-3 border-b border-slate-700/50 bg-slate-800/50 px-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
@@ -142,7 +142,7 @@ function AssistantChat() {
           const pane = event.currentTarget;
           nearBottomRef.current = pane.scrollHeight - pane.scrollTop - pane.clientHeight < 120;
         }}
-        className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-6 sm:py-7"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-5 sm:px-6 sm:py-7"
       >
         <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-4">
           {hasMore && (
@@ -219,7 +219,7 @@ function AssistantChat() {
         </div>
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-slate-700/50 p-3 sm:px-6 sm:py-4">
+      <form onSubmit={handleSend} className="shrink-0 border-t border-slate-700/50 p-3 sm:px-6 sm:py-4">
         <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-slate-700 bg-slate-800/60 p-2 focus-within:border-cyan-500">
           <textarea
             value={text}

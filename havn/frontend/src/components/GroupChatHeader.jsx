@@ -44,7 +44,7 @@ function GroupChatHeader() {
   }, [menuOpen]);
 
   return (
-    <div className="relative flex justify-between items-center bg-slate-800/50 border-b border-slate-700/50 min-h-[72px] max-h-[84px] px-2 sm:px-6 flex-1">
+    <div className="relative flex shrink-0 justify-between items-center bg-slate-800/50 border-b border-slate-700/50 min-h-[72px] max-h-[84px] px-2 sm:px-6">
       <button
         onClick={() => setShowInfo(true)}
         className="flex items-center space-x-3 text-left flex-1 min-w-0"

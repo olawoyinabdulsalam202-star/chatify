@@ -58,7 +58,7 @@ function CreateGroupModal({ onClose }) {
 
         {step === 1 ? (
           <>
-            <div className="flex-1 overflow-y-auto p-4 space-y-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-1">
               {allContacts.length === 0 ? (
                 <p className="text-slate-500 text-sm text-center py-6">No contacts yet.</p>
               ) : (
@@ -93,7 +93,7 @@ function CreateGroupModal({ onClose }) {
             </div>
           </>
         ) : (
-          <div className="p-4 space-y-4 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
             <div className="flex justify-center">
               <button
                 onClick={() => fileInputRef.current?.click()}
