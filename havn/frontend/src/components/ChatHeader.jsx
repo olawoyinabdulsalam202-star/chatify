@@ -5,7 +5,6 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
 import VerifiedBadge from "./VerifiedBadge";
 import { presenceLabel } from "../lib/lastSeen";
-import AssistantFab from "./AssistantFab";
 
 function ChatHeader() {
   const { selectedUser, setSelectedUser } = useChatStore();
@@ -120,7 +119,6 @@ function ChatHeader() {
           </div>
         )}
       </div>
-      <AssistantFab />
     </div>
   );
 }

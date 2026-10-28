@@ -17,6 +17,10 @@ import GroupChatContainer from "../components/GroupChatContainer";
 import NoConversationPlaceholder from "../components/NoConversationPlaceholder";
 import StoryTray from "../components/StoryTray";
 import StoryViewerModal from "../components/StoryViewerModal";
+import AssistantFloatingButton from "../components/AssistantFloatingButton";
+import AssistantListRow from "../components/AssistantListRow";
+import AssistantChat from "../components/AssistantChat";
+import { useAssistantStore } from "../store/useAssistantStore";
 
 function ChatPage() {
   const activeTab = useChatStore((state) => state.activeTab);
@@ -24,6 +28,8 @@ function ChatPage() {
   const chats = useChatStore((state) => state.chats);
   const setSelectedUser = useChatStore((state) => state.setSelectedUser);
   const setActiveTab = useChatStore((state) => state.setActiveTab);
+  const assistantOpen = useAssistantStore((state) => state.isOpen);
+  const closeAssistant = useAssistantStore((state) => state.close);
   const selectedGroup = useGroupStore((state) => state.selectedGroup);
   const groups = useGroupStore((state) => state.groups);
   const setSelectedGroup = useGroupStore((state) => state.setSelectedGroup);
@@ -70,9 +76,14 @@ function ChatPage() {
   // The DM and group selections are mutually exclusive — switching tabs
   // clears whichever one doesn't belong to the tab you switched to.
   useEffect(() => {
+    if (assistantOpen) return;
     if (activeTab === "groups") setSelectedUser(null);
     else setSelectedGroup(null);
-  }, [activeTab, setSelectedUser, setSelectedGroup]);
+  }, [activeTab, assistantOpen, setSelectedUser, setSelectedGroup]);
+
+  useEffect(() => {
+    if (assistantOpen && (selectedUser || selectedGroup)) closeAssistant();
+  }, [assistantOpen, selectedUser, selectedGroup, closeAssistant]);
 
   // Notification URLs carry the originating conversation id. Resolve it from
   // the normal loaded lists so a notification click behaves like Telegram,
@@ -94,7 +105,8 @@ function ChatPage() {
   }, [location.search, chats, groups, selectedUser, selectedGroup, activeTab, setSelectedUser, setSelectedGroup, setActiveTab]);
 
   const showingGroup = activeTab === "groups" && selectedGroup;
-  const showingChat = selectedUser || showingGroup;
+  const showingChat = Boolean(selectedUser || showingGroup || assistantOpen);
+  const showAssistantButton = !selectedUser && !showingGroup && !assistantOpen;
 
   // Height tracks App.jsx's padding (p-2 on mobile, sm:p-4 above) so the chat
   // fills the screen without overflowing it. 100dvh — not 100vh — because vh on
@@ -104,18 +116,28 @@ function ChatPage() {
     <div className="relative w-full max-w-6xl min-h-0 h-[calc(100dvh-1rem)] sm:h-[calc(100dvh-2rem)] md:h-[800px]">
       <Panel>
         {/* LEFT SIDE - hidden on mobile when chat is open */}
-        <div className={`${showingChat ? "hidden md:flex" : "flex"} min-h-0 w-full md:w-80 bg-slate-800 flex-col`}>
+        <div className={`relative ${showingChat ? "hidden md:flex" : "flex"} min-h-0 w-full md:w-80 bg-slate-800 flex-col`}>
           <ProfileHeader />
           <StoryTray />
           <ActiveTabSwitch />
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {activeTab === "groups" ? <GroupsList /> : <ChatsList />}
+          <div className="flex-1 overflow-y-auto p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] space-y-2">
+            {activeTab === "groups" ? (
+              <GroupsList />
+            ) : (
+              <>
+                <AssistantListRow />
+                <ChatsList />
+              </>
+            )}
           </div>
+          {showAssistantButton && <AssistantFloatingButton />}
         </div>
 
         {/* RIGHT SIDE - hidden on mobile when no chat selected */}
         <div className={`${showingChat ? "flex" : "hidden md:flex"} min-w-0 min-h-0 flex-1 flex-col bg-slate-900`}>
-          {selectedUser ? (
+          {assistantOpen ? (
+            <AssistantChat />
+          ) : selectedUser ? (
             <ChatContainer />
           ) : showingGroup ? (
             <GroupChatContainer />

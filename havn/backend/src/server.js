@@ -13,6 +13,7 @@ import adminRoutes from "./routes/admin.route.js";
 import friendRoutes from "./routes/friend.route.js";
 import pushRoutes from "./routes/push.route.js";
 import stickerRoutes from "./routes/sticker.route.js";
+import assistantRoutes from "./routes/assistant.route.js";
 import dns from "node:dns/promises";
 import { connectDB } from "./lib/db.js";
 import { ENV } from "./lib/env.js";
@@ -61,6 +62,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/stickers", stickerRoutes);
+app.use("/api/assistant", assistantRoutes);
 
 server.listen(PORT, () => {
   console.log("Server running on port: " + PORT);

@@ -33,7 +33,7 @@ export const seedBotUser = async () => {
 
 export const getBotUserId = () => botUserId;
 
-export const askAssistant = async ({ question, groupName = null, history = [] }) => {
+export const askAssistant = async ({ question, groupName = null, history = [], privateChat = false }) => {
   if (!ENV.GROQ_API_KEY) {
     const error = new Error("The assistant is not configured on the server.");
     error.code = "AI_NOT_CONFIGURED";
@@ -53,7 +53,9 @@ export const askAssistant = async ({ question, groupName = null, history = [] })
       messages: [
         {
           role: "system",
-          content: `You are ${ENV.BOT_NAME}, Havn's private AI assistant${groupName ? ` helping inside the group "${groupName}"` : ""}. Be concise, friendly, and practical. This answer is private to the person asking; do not claim to have taken actions you cannot take. Plain text only.`,
+          content: privateChat
+            ? `You are ${ENV.BOT_NAME}, a private one-to-one AI assistant. Reply concisely, clearly, and practically in plain text. This conversation is visible only to the person asking. Do not claim to take actions you cannot take.`
+            : `You are ${ENV.BOT_NAME}, Havn's private AI assistant${groupName ? ` helping inside the group "${groupName}"` : ""}. Be concise, friendly, and practical. This answer is private to the person asking; do not claim to have taken actions you cannot take. Plain text only.`,
         },
         ...history,
         { role: "user", content: question },

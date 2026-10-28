@@ -58,6 +58,8 @@ export const ENV = {
   BOT_MODEL: process.env.BOT_MODEL || "openai/gpt-oss-120b",
   BOT_NAME: process.env.BOT_NAME || "Havn",
   BOT_EMAIL: process.env.BOT_EMAIL || "kairos.bot@internal.chatify",
+  ASSISTANT_RATE_PER_MIN: Number.parseInt(process.env.ASSISTANT_RATE_PER_MIN || "10", 10),
+  ASSISTANT_DAILY_LIMIT: Number.parseInt(process.env.ASSISTANT_DAILY_LIMIT || "100", 10),
   // Comma-separated list of emails that get isAdmin:true automatically at
   // signup — the only way to bootstrap the first admin account.
   ADMIN_EMAILS: (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean),

@@ -3,7 +3,7 @@ import { getReceiverSocketId, io } from "../lib/socket.js";
 import Message from "../modules/Message.js";
 import User from "../modules/User.js";
 import Group from "../modules/Group.js";
-import { getBotUserId, askAssistant } from "../lib/bot.js";
+import { getBotUserId } from "../lib/bot.js";
 import { PUBLIC_USER_FIELDS, shapeLastSeenMany } from "../lib/publicFields.js";
 import { sendPushToUser, previewText } from "../lib/push.js";
 
@@ -21,26 +21,6 @@ export const getAllContacts = async (req, res) => {
   } catch (error) {
     console.log("Error in getAllContacts:", error);
     res.status(500).json({ message: "Server error" });
-  }
-};
-
-export const askPrivateAssistant = async (req, res) => {
-  try {
-    const { text, groupId } = req.body || {};
-    if (!text?.trim()) return res.status(400).json({ message: "A question is required." });
-    let groupName = null;
-    if (groupId) {
-      const group = await Group.findById(groupId).select("name members");
-      if (!group) return res.status(404).json({ message: "Group not found." });
-      if (!group.isMember(req.user._id)) return res.status(403).json({ message: "You are not a member of this group." });
-      groupName = group.name;
-    }
-    const answer = await askAssistant({ question: text.trim(), groupName });
-    res.status(200).json({ answer });
-  } catch (error) {
-    if (error.code === "AI_NOT_CONFIGURED") return res.status(503).json({ message: "The assistant is not configured on the server yet." });
-    console.log("Error in askPrivateAssistant:", error.message);
-    res.status(502).json({ message: "The assistant is unavailable right now." });
   }
 };
 

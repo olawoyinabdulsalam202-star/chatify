@@ -13,7 +13,6 @@ import { useGroupStore } from "../store/useGroupStore";
 import { useAuthStore } from "../store/useAuthStore";
 import VerifiedBadge from "./VerifiedBadge";
 import GroupInfoModal from "./GroupInfoModal";
-import AssistantFab from "./AssistantFab";
 
 function GroupChatHeader() {
   const { selectedGroup, setSelectedGroup, removeMember } = useGroupStore();
@@ -119,7 +118,6 @@ function GroupChatHeader() {
       </div>
 
       {showInfo && <GroupInfoModal onClose={() => setShowInfo(false)} />}
-      <AssistantFab groupId={selectedGroup._id} />
     </div>
   );
 }
