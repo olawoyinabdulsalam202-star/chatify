@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { useGroupStore } from "../store/useGroupStore";
 import { useStoryStore } from "../store/useStoryStore";
@@ -21,8 +21,12 @@ import AssistantFloatingButton from "../components/AssistantFloatingButton";
 import AssistantListRow from "../components/AssistantListRow";
 import AssistantChat from "../components/AssistantChat";
 import { useAssistantStore } from "../store/useAssistantStore";
+import { useSidebarWidth } from "../hooks/useSidebarWidth";
 
 function ChatPage() {
+  const { width: sidebarWidth, maxWidth: sidebarMaxWidth, setWidth, persistWidth, clampWidth } = useSidebarWidth();
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const sidebarDragRef = useRef(null);
   const activeTab = useChatStore((state) => state.activeTab);
   const selectedUser = useChatStore((state) => state.selectedUser);
   const chats = useChatStore((state) => state.chats);
@@ -46,6 +50,65 @@ function ChatPage() {
   const unsubscribeFromFriendEvents = useFriendStore((state) => state.unsubscribeFromFriendEvents);
   const subscribeGlobalHandlers = useChatStore((state) => state.subscribeGlobalHandlers);
   const unsubscribeGlobalHandlers = useChatStore((state) => state.unsubscribeGlobalHandlers);
+
+  const finishSidebarResize = useCallback(() => {
+    const drag = sidebarDragRef.current;
+    if (!drag) return;
+    if (drag.frame) cancelAnimationFrame(drag.frame);
+    setWidth(drag.nextWidth);
+    persistWidth(drag.nextWidth);
+    sidebarDragRef.current = null;
+    setIsResizingSidebar(false);
+    document.body.classList.remove("sidebar-resizing");
+  }, [persistWidth, setWidth]);
+
+  useEffect(() => () => {
+    if (sidebarDragRef.current?.frame) cancelAnimationFrame(sidebarDragRef.current.frame);
+    document.body.classList.remove("sidebar-resizing");
+  }, []);
+
+  const startSidebarResize = (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    sidebarDragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startWidth: sidebarWidth,
+      nextWidth: sidebarWidth,
+      frame: null,
+    };
+    setIsResizingSidebar(true);
+    document.body.classList.add("sidebar-resizing");
+  };
+
+  const moveSidebarResize = (event) => {
+    const drag = sidebarDragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag.nextWidth = clampWidth(drag.startWidth + event.clientX - drag.startX);
+    if (!drag.frame) {
+      drag.frame = requestAnimationFrame(() => {
+        const currentDrag = sidebarDragRef.current;
+        if (!currentDrag) return;
+        currentDrag.frame = null;
+        setWidth(currentDrag.nextWidth);
+      });
+    }
+  };
+
+  const resizeSidebarWithKeyboard = (event) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const nextWidth = clampWidth(sidebarWidth + (event.key === "ArrowRight" ? 16 : -16));
+    setWidth(nextWidth);
+    persistWidth(nextWidth);
+  };
+
+  const resetSidebarWidth = () => {
+    const defaultWidth = clampWidth(380);
+    setWidth(defaultWidth);
+    persistWidth(defaultWidth);
+  };
 
   // Story, friend-request, and group events need to work no matter which
   // tab/chat is open, so they're subscribed once at the page level rather than
@@ -114,9 +177,12 @@ function ChatPage() {
   // input off-screen until you scroll.
   return (
     <div className="relative w-full max-w-6xl min-h-0 h-full max-h-[920px]">
-      <Panel>
+      <Panel
+        className="md:grid md:grid-cols-[var(--sidebar-w)_6px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]"
+        style={{ "--sidebar-w": `${sidebarWidth}px` }}
+      >
         {/* LEFT SIDE - hidden on mobile when chat is open */}
-        <div className={`relative ${showingChat ? "hidden md:flex" : "flex"} min-h-0 w-full md:w-80 bg-slate-800 flex-col`}>
+        <div className={`relative ${showingChat ? "hidden md:flex" : "flex"} min-h-0 min-w-0 w-full md:w-auto bg-slate-800 flex-col`}>
           <div className="shrink-0"><ProfileHeader /></div>
           <div className="shrink-0"><StoryTray /></div>
           <div className="shrink-0"><ActiveTabSwitch /></div>
@@ -133,8 +199,32 @@ function ChatPage() {
           {showAssistantButton && <AssistantFloatingButton />}
         </div>
 
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-valuenow={sidebarWidth}
+          aria-valuemin={280}
+          aria-valuemax={sidebarMaxWidth}
+          aria-label="Resize chat list"
+          tabIndex={0}
+          onPointerDown={startSidebarResize}
+          onPointerMove={moveSidebarResize}
+          onPointerUp={finishSidebarResize}
+          onPointerCancel={finishSidebarResize}
+          onLostPointerCapture={finishSidebarResize}
+          onDoubleClick={resetSidebarWidth}
+          onKeyDown={resizeSidebarWithKeyboard}
+          className={`group hidden md:flex h-full w-[6px] cursor-col-resize touch-none items-center justify-center outline-none ${
+            isResizingSidebar ? "bg-slate-800" : "bg-transparent hover:bg-slate-800/70 focus-visible:bg-slate-800/70"
+          }`}
+        >
+          <span className={`h-full w-px transition-colors ${
+            isResizingSidebar ? "bg-cyan-400" : "bg-slate-700 group-hover:bg-cyan-500 group-focus-visible:bg-cyan-500"
+          }`} />
+        </div>
+
         {/* RIGHT SIDE - hidden on mobile when no chat selected */}
-        <div className={`${showingChat ? "flex" : "hidden md:flex"} min-w-0 min-h-0 flex-1 flex-col bg-slate-900`}>
+        <div className={`${showingChat ? "flex" : "hidden md:flex"} min-w-0 min-h-0 w-full md:w-auto flex-1 flex-col bg-slate-900`}>
           {assistantOpen ? (
             <AssistantChat />
           ) : selectedUser ? (

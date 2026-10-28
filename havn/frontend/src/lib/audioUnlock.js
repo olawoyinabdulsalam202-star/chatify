@@ -25,6 +25,8 @@ let ringtone = null;
 let notifSound = null;
 let unlocked = false;
 let initialized = false;
+let lastNotificationAt = 0;
+const recentNotificationIds = new Map();
 const listeners = new Set();
 
 function getRingtone() {
@@ -187,6 +189,41 @@ export function playNotificationSound() {
     // Still blocked because no gesture ever landed. Nothing to do — the unread
     // badge already reflects the message, so we just stay silent.
   });
+}
+
+export function playNotificationSoundOnce(messageId) {
+  const now = Date.now();
+  const key = messageId ? String(messageId) : "";
+  const lastPlayed = key ? recentNotificationIds.get(key) : null;
+  if (lastPlayed && now - lastPlayed < 60_000) return false;
+  if (now - lastNotificationAt < 1500) return false;
+
+  try {
+    const storageKey = key ? `havn.notificationPlayed.${key}` : "";
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const existingKey = localStorage.key(index);
+      if (!existingKey?.startsWith("havn.notificationPlayed.")) continue;
+      const playedAt = Number(localStorage.getItem(existingKey));
+      if (!Number.isFinite(playedAt) || now - playedAt >= 60_000) localStorage.removeItem(existingKey);
+    }
+    const storedPlayedAt = storageKey ? Number(localStorage.getItem(storageKey)) : 0;
+    const storedLastPing = Number(localStorage.getItem("havn.lastNotificationSoundAt")) || 0;
+    if ((storedPlayedAt && now - storedPlayedAt < 60_000) || now - storedLastPing < 1500) return false;
+    if (storageKey) localStorage.setItem(storageKey, String(now));
+    localStorage.setItem("havn.lastNotificationSoundAt", String(now));
+  } catch {
+    // Continue with in-memory deduplication when storage is unavailable.
+  }
+
+  lastNotificationAt = now;
+  if (key) {
+    recentNotificationIds.set(key, now);
+    recentNotificationIds.forEach((playedAt, id) => {
+      if (now - playedAt >= 60_000) recentNotificationIds.delete(id);
+    });
+  }
+  playNotificationSound();
+  return true;
 }
 
 // Vibration is a separate permission track from audio: it works without a prior

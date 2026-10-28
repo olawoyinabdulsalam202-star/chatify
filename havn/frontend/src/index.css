@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+body.sidebar-resizing {
+  cursor: col-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.sidebar-resizing iframe,
+body.sidebar-resizing img {
+  pointer-events: none;
+}
+
 /* ============================================================
    HAVN THEME PALETTES
    ------------------------------------------------------------

@@ -13,7 +13,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useChatStore } from "./store/useChatStore";
 import { useGroupStore } from "./store/useGroupStore";
 import { useCallStore } from "./store/useCallStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import PageLoader from "./components/PageLoader";
 import IncomingCallModal from "./components/IncomingCallModal";
 import CallScreen from "./components/CallScreen";
@@ -21,6 +21,7 @@ import InstallPrompt from "./components/InstallPrompt";
 import UpdatePrompt from "./components/UpdatePrompt";
 import NotificationPermissionBanner from "./components/NotificationPermissionBanner";
 import { loadFont, getFontStack } from "./lib/fonts";
+import { playNotificationSoundOnce } from "./lib/audioUnlock";
 
 import { Toaster } from "react-hot-toast";
 
@@ -29,7 +30,12 @@ function App() {
   const { callState, subscribeToCallEvents, unsubscribeFromCallEvents } = useCallStore();
   const selectedUser = useChatStore((state) => state.selectedUser);
   const selectedGroup = useGroupStore((state) => state.selectedGroup);
+  const unreadCounts = useChatStore((state) => state.unreadCounts);
+  const [isDocumentFocused, setIsDocumentFocused] = useState(
+    () => document.visibilityState === "visible" && document.hasFocus()
+  );
   const location = useLocation();
+  const unreadTotal = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
   // Full-bleed public pages run edge-to-edge with their own scroll instead of the
   // centred app shell: the logged-out landing page, plus the legal pages, which
@@ -42,6 +48,65 @@ function App() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    const updateFocus = () => {
+      const focused = document.visibilityState === "visible" && document.hasFocus();
+      setIsDocumentFocused(focused);
+      if (focused && location.pathname === "/") {
+        const { selectedUser: openUser, clearUnreadForChat, markAsSeen } = useChatStore.getState();
+        if (openUser) {
+          clearUnreadForChat(openUser._id);
+          markAsSeen(openUser._id);
+        }
+      }
+    };
+    window.addEventListener("focus", updateFocus);
+    window.addEventListener("blur", updateFocus);
+    document.addEventListener("visibilitychange", updateFocus);
+    return () => {
+      window.removeEventListener("focus", updateFocus);
+      window.removeEventListener("blur", updateFocus);
+      document.removeEventListener("visibilitychange", updateFocus);
+    };
+  }, [location.pathname]);
+
+  useEffect(() => {
+    document.title = authUser
+      ? !isDocumentFocused && unreadTotal > 0
+        ? `(${unreadTotal}) Havn`
+        : "Havn"
+      : "Havn — a calmer place to talk";
+  }, [authUser, isDocumentFocused, unreadTotal]);
+
+  useEffect(() => {
+    if (!authUser || !("serviceWorker" in navigator)) return;
+    const handleServiceWorkerMessage = (event) => {
+      if (event.data?.type !== "PUSH_RECEIVED") return;
+      const payload = event.data.payload || {};
+      if (payload.kind !== "dm" && payload.kind !== "group") return;
+
+      const currentUser = useAuthStore.getState().authUser;
+      if (payload.senderId && String(payload.senderId) === String(currentUser?._id)) return;
+
+      const focused = document.visibilityState === "visible" && document.hasFocus();
+      const openUser = useChatStore.getState().selectedUser;
+      const openGroup = useGroupStore.getState().selectedGroup;
+      const isOpenFocusedChat = focused && location.pathname === "/" && (
+        (payload.kind === "dm" && payload.senderId && String(openUser?._id) === String(payload.senderId)) ||
+        (payload.kind === "group" && payload.groupId && String(openGroup?._id) === String(payload.groupId))
+      );
+      if (isOpenFocusedChat) return;
+
+      if (payload.kind === "dm" && payload.senderId) {
+        useChatStore.getState().recordIncomingMessage(payload.senderId, payload.messageId);
+      }
+      if (!useChatStore.getState().isSoundEnabled) return;
+      playNotificationSoundOnce(payload.messageId || payload.tag);
+    };
+    navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
+  }, [authUser, location.pathname]);
 
   // Call signalling is subscribed here rather than on ChatPage so it survives
   // navigation. It re-runs when authUser changes because the socket only exists
@@ -78,7 +143,9 @@ function App() {
   // A visible Havn tab should only suppress a push for the conversation the
   // user is actually reading, not for messages arriving in another chat.
   useEffect(() => {
-    const context = selectedUser
+    const context = location.pathname !== "/"
+      ? null
+      : selectedUser
       ? { kind: "dm", id: selectedUser._id }
       : selectedGroup
       ? { kind: "group", id: selectedGroup._id }
@@ -86,7 +153,7 @@ function App() {
     const message = { type: "ACTIVE_CONTEXT", context };
     navigator.serviceWorker?.controller?.postMessage(message);
     navigator.serviceWorker?.ready.then((registration) => registration.active?.postMessage(message)).catch(() => {});
-  }, [selectedUser, selectedGroup]);
+  }, [location.pathname, selectedUser, selectedGroup]);
 
   // The safe-area inset padding lives on <body>, so its background is what fills
   // the notch and home-indicator gaps. The landing and legal pages are always

@@ -288,6 +288,7 @@ export const sendMessage = async (req, res) => {
       body: previewText(newMessage),
       tag: `dm-${senderId}`,
       url: `/?dm=${senderId}`,
+      messageId: String(newMessage._id),
       senderId: String(senderId),
       kind: "dm",
       // Shown as the notification's icon so it reads like a real message from

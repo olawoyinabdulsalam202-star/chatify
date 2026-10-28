@@ -3,7 +3,7 @@ import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { setAppBadge } from "../lib/push";
-import { playNotificationSound } from "../lib/audioUnlock";
+import { playNotificationSoundOnce } from "../lib/audioUnlock";
 
 // Keeps references to the handlers currently attached to the socket, so
 // unsubscribe can remove exactly those (and not a shared-event listener
@@ -15,6 +15,14 @@ let dmSocketHandlers = null;
 // make one of the two disappear when the responses reconcile.
 let tempIdCounter = 0;
 const nextTempId = () => `temp-${Date.now()}-${++tempIdCounter}`;
+function getSoundPreference() {
+  try {
+    const saved = localStorage.getItem("isSoundEnabled");
+    return saved === null ? true : JSON.parse(saved) === true;
+  } catch {
+    return true;
+  }
+}
 const mergeMessagesById = (current, incoming) => {
   const merged = new Map(current.map((message) => [message._id, message]));
   incoming.forEach((message) => merged.set(message._id, message));
@@ -27,6 +35,7 @@ const mergeMessagesById = (current, incoming) => {
 // currently looking at still ring, bump them to the top of the Chats list,
 // and show an unread badge, the way every other chat app behaves.
 let globalSocketHandlers = null;
+const recentUnreadMessageIds = new Map();
 
 export const useChatStore = create((set, get) => ({
   allContacts: [],
@@ -37,7 +46,7 @@ export const useChatStore = create((set, get) => ({
   selectedUser: null,
   isUsersLoading: false,
   isMessagesLoading: false,
-  isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
+  isSoundEnabled: getSoundPreference(),
   typingUserId: null, // the other user's id, when THEY are typing to us
   replyTarget: null, // message currently being replied to
   viewOnceCache: {}, // messageId -> { imageUrl, videoUrl, duration } for view-once media opened this session (memory only, never persisted)
@@ -47,8 +56,36 @@ export const useChatStore = create((set, get) => ({
   clearReplyTarget: () => set({ replyTarget: null }),
 
   toggleSound: () => {
-    localStorage.setItem("isSoundEnabled", !get().isSoundEnabled);
-    set({ isSoundEnabled: !get().isSoundEnabled });
+    const isSoundEnabled = !get().isSoundEnabled;
+    try {
+      localStorage.setItem("isSoundEnabled", String(isSoundEnabled));
+    } catch {
+      // Keep the setting for this session when storage is unavailable.
+    }
+    set({ isSoundEnabled });
+  },
+
+  clearUnreadForChat: (userId) => {
+    const { [userId]: _cleared, ...rest } = get().unreadCounts;
+    set({ unreadCounts: rest });
+    setAppBadge(Object.values(rest).reduce((sum, count) => sum + count, 0));
+  },
+
+  recordIncomingMessage: (senderId, messageId) => {
+    if (!senderId) return;
+    const now = Date.now();
+    const id = messageId ? String(messageId) : "";
+    if (id && recentUnreadMessageIds.has(id)) return;
+    if (id) {
+      recentUnreadMessageIds.set(id, now);
+      recentUnreadMessageIds.forEach((receivedAt, receivedId) => {
+        if (now - receivedAt > 60_000) recentUnreadMessageIds.delete(receivedId);
+      });
+    }
+    const unreadCounts = get().unreadCounts;
+    const nextUnread = { ...unreadCounts, [senderId]: (unreadCounts[senderId] || 0) + 1 };
+    set({ unreadCounts: nextUnread });
+    setAppBadge(Object.values(nextUnread).reduce((sum, count) => sum + count, 0));
   },
 
   setActiveTab: (tab) => set({ activeTab: tab }),
@@ -325,7 +362,9 @@ export const useChatStore = create((set, get) => ({
 
         const currentMessages = get().messages;
         set({ messages: [...currentMessages, newMessage] });
-        get().markAsSeen(selectedUser._id);
+        if (document.visibilityState === "visible" && document.hasFocus()) {
+          get().markAsSeen(selectedUser._id);
+        }
 
         // Sound is now handled by the global handler below, which fires
         // regardless of which chat is open — this per-conversation subscription
@@ -419,22 +458,18 @@ export const useChatStore = create((set, get) => ({
       newMessage: (message) => {
         if (message.groupId) return; // handled by useGroupStore
 
-        const { selectedUser, isSoundEnabled, unreadCounts } = get();
+        const { selectedUser, isSoundEnabled } = get();
         const authUserId = useAuthStore.getState().authUser?._id;
         const isFromSelectedUser = selectedUser?._id === message.senderId;
+        const isFocused = document.visibilityState === "visible" && document.hasFocus();
+        const isFocusedChat = isFocused && isFromSelectedUser;
+        const isIncoming = String(message.receiverId) === String(authUserId);
         const isIncomingUnread =
-          String(message.receiverId) === String(authUserId) && message.status !== "seen";
+          isIncoming && message.status !== "seen";
 
-        if (!isFromSelectedUser && isIncomingUnread) {
+        if (!isFocusedChat && isIncomingUnread) {
           // Bump unread count for this sender.
-          const nextUnread = {
-            ...unreadCounts,
-            [message.senderId]: (unreadCounts[message.senderId] || 0) + 1,
-          };
-          set({ unreadCounts: nextUnread });
-          // Mirror the total onto the app icon, so an installed PWA shows a
-          // count on the home screen the way a native chat app does.
-          setAppBadge(Object.values(nextUnread).reduce((sum, n) => sum + n, 0));
+          get().recordIncomingMessage(message.senderId, message._id);
 
           // Play sound. Without this global handler, sound only played when the
           // message arrived from someone whose chat you already had open — every
@@ -443,9 +478,10 @@ export const useChatStore = create((set, get) => ({
           // per message: the browser's autoplay grant attaches to a specific
           // element, so a just-constructed one is blocked in production and the
           // ping never sounded.
-          if (isSoundEnabled) {
-            playNotificationSound();
-          }
+        }
+
+        if (isIncoming && message.status !== "seen" && !isFocusedChat && isSoundEnabled) {
+          playNotificationSoundOnce(message._id);
         }
 
         // Refresh the chats list so the sender appears at the top. The old code

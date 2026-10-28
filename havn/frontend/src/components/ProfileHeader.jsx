@@ -4,6 +4,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { Link } from "react-router";
 import VerifiedBadge from "./VerifiedBadge";
+import toast from "react-hot-toast";
 
 const mouseClickSound = new Audio("/sounds/mouse-click.mp3");
 
@@ -33,7 +34,7 @@ function ProfileHeader() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {/* AVATAR */}
-          <div className="avatar online">
+          <div className="avatar online shrink-0">
             <button
               className="size-14 rounded-full overflow-hidden relative group"
               onClick={() => fileInputRef.current.click()}
@@ -60,7 +61,7 @@ function ProfileHeader() {
           {/* USERNAME & ONLINE TEXT */}
           <div className="min-w-0">
             <h3 className="text-slate-200 font-medium text-base truncate flex items-center gap-1">
-              {authUser.fullName}
+              <span className="min-w-0 truncate">{authUser.fullName}</span>
               {authUser.isBadged && <VerifiedBadge className="w-4 h-4 shrink-0" />}
             </h3>
 
@@ -87,11 +88,14 @@ function ProfileHeader() {
           {/* SOUND TOGGLE BTN */}
           <button
             className="text-slate-400 hover:text-slate-200 transition-colors"
+            title={isSoundEnabled ? "Sound on" : "Sound off"}
+            aria-label={isSoundEnabled ? "Sound on" : "Sound off"}
             onClick={() => {
               // play click sound before toggling
               mouseClickSound.currentTime = 0; // reset to start
               mouseClickSound.play().catch((error) => console.log("Audio play failed:", error));
               toggleSound();
+              toast.success(isSoundEnabled ? "Sound off" : "Sound on");
             }}
           >
             {isSoundEnabled ? (

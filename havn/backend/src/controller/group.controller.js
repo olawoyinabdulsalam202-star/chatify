@@ -657,6 +657,8 @@ export const sendGroupMessage = async (req, res) => {
         // notification instead of stacking one per message.
         tag: `group-${groupId}`,
         url: `/?group=${groupId}`,
+        messageId: String(newMessage._id),
+        senderId: String(senderId),
         groupId: String(groupId),
         kind: "group",
         // The sender's face, not the group icon — matches who actually sent

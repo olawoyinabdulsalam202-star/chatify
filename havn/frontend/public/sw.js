@@ -176,6 +176,11 @@ self.addEventListener("push", (event) => {
         type: "window",
         includeUncontrolled: true,
       });
+
+      clientList.forEach((client) =>
+        client.postMessage({ type: "PUSH_RECEIVED", payload: data })
+      );
+
       const hasRelevantVisibleWindow = clientList.some((c) => {
         if (c.visibilityState !== "visible") return false;
         const context = activeContexts.get(c.id);
@@ -184,11 +189,6 @@ self.addEventListener("push", (event) => {
         if (data.kind === "group") return context.kind === "group" && String(context.id) === String(data.groupId);
         return false;
       });
-
-      // Tell open pages about it regardless, so in-app badges update live.
-      clientList.forEach((client) =>
-        client.postMessage({ type: "PUSH_RECEIVED", payload: data })
-      );
 
       if (hasRelevantVisibleWindow) return;
 

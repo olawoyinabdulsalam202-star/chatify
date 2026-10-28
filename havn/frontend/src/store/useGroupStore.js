@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
+import { useChatStore } from "./useChatStore";
+import { playNotificationSoundOnce } from "../lib/audioUnlock";
 
 let groupSocketHandlers = null;
 
@@ -372,7 +374,20 @@ export const useGroupStore = create((set, get) => ({
 
     const handlers = {
       newGroupMessage: (message) => {
+        const authUserId = useAuthStore.getState().authUser?._id;
+        const senderId = message.senderId?._id || message.senderId;
         const { selectedGroup, groupMessages } = get();
+        const isFocusedGroup =
+          document.visibilityState === "visible" &&
+          document.hasFocus() &&
+          String(selectedGroup?._id) === String(message.groupId);
+        if (
+          String(senderId) !== String(authUserId) &&
+          !isFocusedGroup &&
+          useChatStore.getState().isSoundEnabled
+        ) {
+          playNotificationSoundOnce(message._id);
+        }
         if (selectedGroup && message.groupId === selectedGroup._id) {
           if (groupMessages.some((m) => m._id === message._id)) return; // already have it (optimistic/REST echo)
           set({ groupMessages: [...groupMessages, message] });
