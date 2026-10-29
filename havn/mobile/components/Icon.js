@@ -19,6 +19,9 @@ const shapes = {
   bell: <><Path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></>,
   sound: <><Path d="M11 5 6 9H3v6h3l5 4V5Zm4 4a4 4 0 0 1 0 6m3-9a8 8 0 0 1 0 12" /></>,
   soundOff: <><Path d="M11 5 6 9H3v6h3l5 4V5Zm5 4 5 6m0-6-5 6" /></>,
+  bot: <><Rect x="4" y="7" width="16" height="13" rx="4" /><Path d="M12 3v4m-4 6h.01M16 13h.01M8 17h8" /></>,
+  more: <><Circle cx="12" cy="5" r="1" /><Circle cx="12" cy="12" r="1" /><Circle cx="12" cy="19" r="1" /></>,
+  trash: <><Path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6" /></>,
 };
 
 export default function Icon({ name, size = 22, color = "#3A332B", strokeWidth = 1.8 }) {

@@ -623,6 +623,24 @@ export const getChatPartners = async (req, res) => {
         const pair = messages.filter((message) =>
           String(message.senderId) === partnerId || String(message.receiverId) === partnerId
         );
+        const newestMessage = pair[0];
+        const lastMessage = newestMessage ? {
+          _id: newestMessage._id,
+          text: newestMessage.text,
+          ...(newestMessage.viewOnce ? { viewOnce: true } : { image: newestMessage.image, video: newestMessage.video }),
+          audio: newestMessage.audio,
+          gif: newestMessage.gif,
+          sticker: newestMessage.sticker,
+          isDeleted: newestMessage.isDeleted,
+          senderId: newestMessage.senderId,
+          createdAt: newestMessage.createdAt,
+          status: newestMessage.status,
+        } : null;
+        const unreadCount = pair.filter((message) =>
+          String(message.senderId) === partnerId &&
+          String(message.receiverId) === String(loggedInUserId) &&
+          message.status !== "seen"
+        ).length;
         const isFriend = Boolean(
           req.user.friends.some((id) => id.equals(partner._id)) ||
           partner.friends?.some((id) => id.equals(loggedInUserId))
@@ -631,7 +649,7 @@ export const getChatPartners = async (req, res) => {
           !pair.some((message) => String(message.senderId) === String(loggedInUserId));
         const shaped = partner.toObject();
         delete shaped.friends;
-        return { ...shaped, isFriend, isRequest };
+        return { ...shaped, isFriend, isRequest, lastMessage, unreadCount };
       });
 
     res.status(200).json(shapeLastSeenMany(orderedPartners, req.user));

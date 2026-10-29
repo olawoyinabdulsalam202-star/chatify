@@ -16,50 +16,23 @@ export const useChatStore = create((set, get) => ({
   loadChats: async ({ quiet = false, refresh = false } = {}) => {
     if (!quiet) set({ isLoading: !refresh, isRefreshing: refresh, error: "" });
     try {
-      const fresh = await api("/messages/chats");
+      const response = await api("/messages/chats");
+      const fresh = Array.isArray(response) ? response.filter(Boolean) : [];
       const old = get().chats;
       const next = fresh.map((person) => {
         const previous = old.find((item) => String(item._id) === String(person._id));
         return { ...previous, ...person };
       });
       const merged = quiet ? [...next, ...old.filter((item) => !next.some((freshItem) => String(freshItem._id) === String(item._id)))] : next;
-      set({ chats: newestFirst(merged) });
-      get().hydrateChatPreviews(merged);
+      const unreadCounts = { ...get().unreadCounts };
+      if (!quiet) Object.keys(unreadCounts).forEach((id) => { delete unreadCounts[id]; });
+      fresh.forEach((person) => { unreadCounts[String(person._id)] = Number(person.unreadCount) || 0; });
+      set({ chats: newestFirst(merged), unreadCounts });
     } catch (error) {
       if (!quiet) set({ error: error.message });
     } finally {
       if (!quiet) set({ isLoading: false, isRefreshing: false });
     }
-  },
-  hydrateChatPreviews: async (partners) => {
-    const { authUser } = (await import("./useAuthStore")).useAuthStore.getState();
-    if (!authUser?._id || !partners.length) return;
-    const unreadCounts = { ...get().unreadCounts };
-    const summaries = [];
-    for (let start = 0; start < partners.length; start += 5) {
-      const batch = partners.slice(start, start + 5);
-      const result = await Promise.all(batch.map(async (partner) => {
-        try {
-          const messages = await api(`/messages/${partner._id}`);
-          const ordered = [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-          const lastMessage = ordered[ordered.length - 1] || null;
-          const unread = ordered.filter((message) => String(message.receiverId) === String(authUser._id) && message.status !== "seen").length;
-          if (unread) unreadCounts[partner._id] = unread;
-          else delete unreadCounts[partner._id];
-          return { id: partner._id, lastMessage, unread };
-        } catch {
-          return null;
-        }
-      }));
-      summaries.push(...result.filter(Boolean));
-    }
-    set({
-      chats: newestFirst(get().chats.map((chat) => {
-        const summary = summaries.find((item) => String(item.id) === String(chat._id));
-        return summary ? { ...chat, lastMessage: summary.lastMessage } : chat;
-      })),
-      unreadCounts,
-    });
   },
   searchUsers: async (query) => {
     set({ query });
@@ -78,12 +51,15 @@ export const useChatStore = create((set, get) => ({
   },
   openChat: (person) => {
     const id = String(person._id);
-    set({ unreadCounts: { ...get().unreadCounts, [id]: 0 } });
+    set({
+      unreadCounts: { ...get().unreadCounts, [id]: 0 },
+      chats: get().chats.map((chat) => String(chat._id) === id ? { ...chat, unreadCount: 0 } : chat),
+    });
   },
   clearUnread: (id) => {
     const unreadCounts = { ...get().unreadCounts };
-    delete unreadCounts[String(id)];
-    set({ unreadCounts });
+    unreadCounts[String(id)] = 0;
+    set({ unreadCounts, chats: get().chats.map((chat) => String(chat._id) === String(id) ? { ...chat, unreadCount: 0 } : chat) });
   },
   updateFromMessage: (message, currentUserId, isOpen) => {
     const otherId = String(message.senderId) === String(currentUserId) ? String(message.receiverId) : String(message.senderId);
@@ -94,12 +70,30 @@ export const useChatStore = create((set, get) => ({
       get().loadChats({ quiet: true });
       return;
     }
-    const updated = { ...chat, lastMessage: message };
+    const unread = String(message.receiverId) === String(currentUserId) && !isOpen
+      ? (Number(chat.unreadCount ?? get().unreadCounts[otherId]) || 0) + 1
+      : String(message.receiverId) === String(currentUserId) ? 0 : Number(chat.unreadCount ?? get().unreadCounts[otherId]) || 0;
+    const updated = { ...chat, lastMessage: message, unreadCount: unread };
     const chats = newestFirst([updated, ...current.filter((item) => String(item._id) !== otherId)]);
     const unreadCounts = { ...get().unreadCounts };
-    if (String(message.receiverId) === String(currentUserId) && !isOpen) unreadCounts[otherId] = (unreadCounts[otherId] || 0) + 1;
+    unreadCounts[otherId] = unread;
     set({ chats, unreadCounts });
   },
+  applyDelivered: (messageId) => set({
+    chats: get().chats.map((chat) => String(chat.lastMessage?._id) === String(messageId)
+      ? { ...chat, lastMessage: { ...chat.lastMessage, status: "delivered" } }
+      : chat),
+  }),
+  applySeen: (partnerId) => set({
+    chats: get().chats.map((chat) => String(chat._id) === String(partnerId) && String(chat.lastMessage?.senderId) !== String(partnerId)
+      ? { ...chat, lastMessage: { ...chat.lastMessage, status: "seen" } }
+      : chat),
+  }),
+  applyMessageUpdate: (message) => set({
+    chats: get().chats.map((chat) => String(chat.lastMessage?._id) === String(message?._id)
+      ? { ...chat, lastMessage: { ...chat.lastMessage, ...message } }
+      : chat),
+  }),
   markFriendAdded: (person) => {
     if (!person?._id) return;
     set({ chats: get().chats.map((item) => String(item._id) === String(person._id) ? { ...item, ...person, isFriend: true, isRequest: false } : item) });

@@ -4,8 +4,10 @@ import { useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
 import Avatar from "../components/Avatar";
 import ChatRow from "../components/ChatRow";
+import RowErrorBoundary from "../components/RowErrorBoundary";
 import Icon from "../components/Icon";
 import { SkeletonRows } from "../components/LoadingView";
+import { api } from "../lib/api";
 import { useTheme } from "../lib/theme";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useChatStore } from "../stores/useChatStore";
@@ -37,8 +39,14 @@ export default function ChatListScreen() {
   const onlineUsers = usePresenceStore((state) => state.onlineUsers);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [assistantName, setAssistantName] = useState("Havn AI");
 
   useEffect(() => { loadChats(); }, [loadChats]);
+  useEffect(() => {
+    api("/groups/assistant").then((assistant) => {
+      if (typeof assistant?.name === "string" && assistant.name.trim()) setAssistantName(assistant.name.trim());
+    }).catch(() => {});
+  }, []);
   useEffect(() => {
     const timer = setTimeout(() => searchUsers(searchText), 280);
     return () => clearTimeout(timer);
@@ -49,7 +57,9 @@ export default function ChatListScreen() {
     router.push(`/chat/${person._id}`);
   };
   const searching = searchOpen && searchText.trim().length > 0;
-  const listData = [{ _id: "__assistant__", assistant: true }, ...chats];
+  const safeChats = Array.isArray(chats) ? chats.filter(Boolean) : [];
+  const safeSearchResults = Array.isArray(searchResults) ? searchResults.filter(Boolean) : [];
+  const listData = [{ _id: "__assistant__", assistant: true }, ...safeChats];
 
   return <AppScreen edges={["top", "left", "right"]}>
     <View style={[styles.header, { borderBottomColor: theme.border }]}>
@@ -59,22 +69,24 @@ export default function ChatListScreen() {
     </View>
     {searchOpen && <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}><Icon name="search" color={theme.muted} size={19} /><TextInput value={searchText} onChangeText={setSearchText} autoCapitalize="none" autoCorrect={false} placeholder="Search username" placeholderTextColor={theme.muted} style={[styles.searchInput, { color: theme.text }]} /></View>}
     {searching ? <FlatList
-      data={searchResults}
-      keyExtractor={(item) => String(item._id)}
+      data={safeSearchResults}
+      keyExtractor={(item, index) => String(item?._id || `missing-search-${index}`)}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={styles.searchResults}
       ListEmptyComponent={!error ? <Text allowFontScaling style={[styles.emptySearch, { color: theme.muted }]}>{searchText.length < 2 ? "Type at least 2 characters." : "No people found."}</Text> : <Text style={[styles.emptySearch, { color: theme.danger }]}>{error}</Text>}
-      renderItem={({ item }) => <SearchResult person={item} onMessage={() => openPerson(item)} />}
+      renderItem={({ item }) => <RowErrorBoundary key={String(item?._id || "missing-search-result")}><SearchResult person={item} onMessage={() => openPerson(item)} /></RowErrorBoundary>}
     /> : isLoading && chats.length === 0 ? <SkeletonRows count={6} /> : <FlatList
       data={listData}
-      keyExtractor={(item) => String(item._id)}
-      contentContainerStyle={[styles.list, !listData.length && styles.flexGrow]}
+      keyExtractor={(item, index) => String(item?._id || (item?.assistant ? "__assistant__" : `missing-chat-${index}`))}
+      contentContainerStyle={[styles.list, !safeChats.length && styles.flexGrow]}
       refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadChats({ refresh: true })} tintColor={theme.primary} colors={[theme.primary]} />}
-      ListEmptyComponent={<View style={styles.empty}><Text allowFontScaling style={[styles.emptyTitle, { color: theme.text }]}>No conversations yet</Text><Text allowFontScaling style={[styles.emptyCopy, { color: theme.muted }]}>Search for a username to start a chat.</Text></View>}
-      ListHeaderComponent={error && chats.length === 0 ? <Pressable onPress={() => loadChats()}><Text style={[styles.error, { color: theme.danger }]}>{error} · Tap to retry</Text></Pressable> : null}
-      renderItem={({ item }) => item.assistant
-        ? <ChatRow assistant onPress={() => router.push("/assistant")} />
-        : <ChatRow person={item} unread={unreadCounts[item._id] || 0} online={onlineUsers.includes(String(item._id))} onPress={() => openPerson(item)} />}
+      ListEmptyComponent={safeChats.length === 0 ? <View style={styles.empty}><Text allowFontScaling style={[styles.emptyTitle, { color: theme.text }]}>No conversations yet</Text><Text allowFontScaling style={[styles.emptyCopy, { color: theme.muted }]}>Search for a username to start a chat.</Text></View> : null}
+      ListHeaderComponent={error && safeChats.length === 0 ? <Pressable onPress={() => loadChats()}><Text style={[styles.error, { color: theme.danger }]}>{error} · Tap to retry</Text></Pressable> : null}
+      renderItem={({ item }) => <RowErrorBoundary key={String(item?._id || "missing-chat-row")}>
+        {item?.assistant
+          ? <ChatRow assistant assistantName={assistantName} onPress={() => router.push("/assistant")} />
+          : item ? <ChatRow person={item} unread={unreadCounts[String(item._id)] ?? (Number(item.unreadCount) || 0)} online={onlineUsers.includes(String(item._id))} onPress={() => openPerson(item)} /> : null}
+      </RowErrorBoundary>}
     />}
   </AppScreen>;
 }
