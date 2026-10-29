@@ -89,7 +89,7 @@ export const postAssistantMessage = async (req, res) => {
         console.error("Could not remove unanswered assistant message:", deleteError.message);
       });
       console.error("Private assistant request failed:", error.message);
-      return res.status(502).json({ message: "Havn AI couldn't reply. Please try again." });
+      return res.status(502).json({ message: "Kairos couldn't reply. Please try again." });
     }
 
     const assistantMessage = await AssistantMessage.create({ userId, role: "assistant", text: answer });

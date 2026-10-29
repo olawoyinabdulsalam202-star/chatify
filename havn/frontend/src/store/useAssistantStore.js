@@ -60,7 +60,7 @@ export const useAssistantStore = create((set, get) => ({
       const current = get().messages;
       set({ messages: mergeMessages(current, data.messages), hasMore: data.hasMore });
     } catch (error) {
-      toast.error(error.response?.data?.message || "Couldn't load Havn AI chat.");
+      toast.error(error.response?.data?.message || "Couldn't load Kairos chat.");
     } finally {
       if (requestId === historyRequest && get().ownerId === userId) {
         set({ isLoadingHistory: false });
@@ -130,7 +130,7 @@ export const useAssistantStore = create((set, get) => ({
       return true;
     } catch (error) {
       if (get().ownerId !== userId || useAuthStore.getState().authUser?._id !== userId) return false;
-      const messageText = error.response?.data?.message || "Havn AI couldn't reply. Please try again.";
+      const messageText = error.response?.data?.message || "Kairos couldn't reply. Please try again.";
       set((state) => ({
         messages: state.messages.map((item) =>
           item._id === message._id ? { ...item, isPending: false, hasFailed: true } : item
@@ -159,7 +159,7 @@ export const useAssistantStore = create((set, get) => ({
       set({ messages: [], hasMore: false, errorMessage: null, failedMessageId: null, failedText: "" });
       return true;
     } catch (error) {
-      toast.error(error.response?.data?.message || "Couldn't clear Havn AI chat.");
+      toast.error(error.response?.data?.message || "Couldn't clear Kairos chat.");
       return false;
     }
   },

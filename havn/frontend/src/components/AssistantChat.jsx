@@ -34,7 +34,7 @@ function AssistantChat() {
   const retry = useAssistantStore((state) => state.retry);
   const clear = useAssistantStore((state) => state.clear);
   const close = useAssistantStore((state) => state.close);
-  const [assistantName, setAssistantName] = useState("Havn");
+  const [assistantName, setAssistantName] = useState("Kairos");
   const [text, setText] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const scrollRef = useRef(null);
@@ -45,7 +45,7 @@ function AssistantChat() {
   useEffect(() => {
     loadHistory();
     axiosInstance.get("/groups/assistant")
-      .then(({ data }) => setAssistantName(data.name || "Havn"))
+      .then(({ data }) => setAssistantName(data.name || "Kairos"))
       .catch(() => {});
   }, [loadHistory]);
 
@@ -227,8 +227,8 @@ function AssistantChat() {
 
           {isSending && (
             <div className="flex justify-start">
-              <div className="chat-bubble rounded-2xl bg-slate-800 px-4 py-3 text-sm text-slate-400" aria-label="Havn AI is typing">
-                <span className="animate-pulse">Havn AI is typing…</span>
+              <div className="chat-bubble rounded-2xl bg-slate-800 px-4 py-3 text-sm text-slate-400" aria-label="Kairos is typing">
+                <span className="animate-pulse">Kairos is typing…</span>
               </div>
             </div>
           )}
@@ -257,7 +257,7 @@ function AssistantChat() {
             onKeyDown={(event) => handleEnterToSend(event, handleSend)}
             maxLength={2000}
             rows={1}
-            placeholder="Message Havn AI"
+            placeholder="Message Kairos"
             className="max-h-32 min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500"
           />
           <span className="pb-2 text-[10px] text-slate-500">{text.length}/2000</span>

@@ -39,7 +39,7 @@ function GroupMessageInput() {
   const [showPicker, setShowPicker] = useState(false);
   const [viewOnce, setViewOnce] = useState(false);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
-  const [assistantTag, setAssistantTag] = useState("@havn");
+  const [assistantTag, setAssistantTag] = useState("@kairos");
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const pushRecent = useStickerStore((s) => s.pushRecent);

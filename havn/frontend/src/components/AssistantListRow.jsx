@@ -19,7 +19,7 @@ function AssistantListRow() {
         <BotIcon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium text-slate-100">Havn AI</span>
+        <span className="block truncate font-medium text-slate-100">Kairos</span>
         <span className="block truncate text-xs text-slate-400">A private conversation</span>
       </span>
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-500" />
