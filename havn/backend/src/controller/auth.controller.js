@@ -7,6 +7,10 @@ import crypto from "crypto";
 import { ENV } from "../lib/env.js";
 import cloudinary from "../lib/cloudinary.js";
 import { ensureUserOnboarded } from "../lib/systemAccounts.js";
+import { createDeviceSession, getBearerToken, hashDeviceToken } from "../lib/deviceSessions.js";
+import DeviceSession from "../modules/DeviceSession.js";
+import PushDevice from "../modules/PushDevice.js";
+import { checkLoginLimit, clearLoginFailures, recordLoginFailure } from "../lib/memoryRateLimit.js";
 
 const OTP_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
 const OTP_RESEND_COOLDOWN_MS = 60 * 1000; // 60 seconds between resends
@@ -167,13 +171,22 @@ export const verifyOTP = async (req, res) => {
 
     generateToken(user._id, res);
 
-    res.status(200).json({
-      _id: user._id,
-      username: user.username,
-      fullName: user.fullName,
-      email: user.email,
-      profilePic: user.profilePic,
-    });
+    if (isMobileClient(req)) {
+      const { token, session } = await createDeviceSession(req, user._id);
+      res.status(200).json({
+        user: { _id: user._id, username: user.username, fullName: user.fullName, email: user.email, profilePic: user.profilePic },
+        token,
+        sessionId: session._id,
+      });
+    } else {
+      res.status(200).json({
+        _id: user._id,
+        username: user.username,
+        fullName: user.fullName,
+        email: user.email,
+        profilePic: user.profilePic,
+      });
+    }
 
     try {
       await sendWelcomeEmail(user.email, user.fullName, ENV.CLIENT_URL);
@@ -352,19 +365,22 @@ export const login = async (req, res) => {
   }
 
   try {
+    const accountKey = email.trim().toLowerCase();
+    if (!checkLoginLimit(req.ip, accountKey)) return res.status(429).json({ message: "Invalid credentials. Please try again later." });
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: "Invalid credentials" });
+    if (!user) {
+      recordLoginFailure(req.ip, accountKey);
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
     // never tell the client which one is incorrect: password or email
 
     if (user.lockUntil && user.lockUntil.getTime() > Date.now()) {
-      const minutesLeft = Math.ceil((user.lockUntil.getTime() - Date.now()) / 60000);
-      return res.status(429).json({
-        message: `Too many failed attempts. Try again in ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}.`,
-      });
+      return res.status(429).json({ message: "Invalid credentials. Please try again later." });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
+      recordLoginFailure(req.ip, accountKey);
       user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
       if (user.failedLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
         user.lockUntil = new Date(Date.now() + LOCKOUT_MS);
@@ -373,6 +389,7 @@ export const login = async (req, res) => {
       await user.save();
       return res.status(400).json({ message: "Invalid credentials" });
     }
+    clearLoginFailures(req.ip, accountKey);
 
     // Correct password — clear any prior failed-attempt tracking.
     if (user.failedLoginAttempts || user.lockUntil) {
@@ -398,7 +415,7 @@ export const login = async (req, res) => {
 
     generateToken(user._id, res);
 
-    res.status(200).json({
+    const userResponse = {
       _id: user._id,
       username: user.username,
       fullName: user.fullName,
@@ -410,7 +427,13 @@ export const login = async (req, res) => {
       // load rather than defaulting on and flipping once /auth/check lands.
       showLastSeen: user.showLastSeen,
       settings: user.settings,
-    });
+    };
+    if (isMobileClient(req)) {
+      const { token, session } = await createDeviceSession(req, user._id);
+      res.status(200).json({ user: userResponse, token, sessionId: session._id });
+    } else {
+      res.status(200).json(userResponse);
+    }
 
     // No-ops instantly for anyone who already has it — this is what
     // backfills the welcome DM + Announcements channel for accounts that
@@ -436,6 +459,16 @@ export const logout = async (req, res) => {
   // out has to work even with a dead token), so the user is identified from the
   // cookie directly and any failure is swallowed.
   try {
+    const bearer = getBearerToken(req);
+    if (bearer) {
+      const session = await DeviceSession.findOne({ tokenHash: hashDeviceToken(bearer), revokedAt: null });
+      if (session) {
+        session.revokedAt = new Date();
+        await session.save();
+        await PushDevice.deleteMany({ sessionId: session._id });
+        await User.updateOne({ _id: session.userId }, { $set: { lastSeenAt: new Date() } });
+      }
+    }
     const token = req.cookies?.[AUTH_COOKIE_NAME];
     if (token) {
       const decoded = jwt.verify(token, ENV.JWT_SECRET);
@@ -448,6 +481,49 @@ export const logout = async (req, res) => {
   }
 
   res.status(200).json({ message: "Logged out successfully" });
+};
+
+function isMobileClient(req) {
+  return req.body?.client === "mobile" || req.headers["x-client"] === "havn-mobile";
+}
+
+export const listSessions = async (req, res) => {
+  try {
+    const sessions = await DeviceSession.find({ userId: req.user._id, revokedAt: null, expiresAt: { $gt: new Date() } })
+      .select("platform deviceName userAgent ip lastUsedAt createdAt expiresAt")
+      .sort({ lastUsedAt: -1 }).lean();
+    res.status(200).json(sessions);
+  } catch (error) {
+    console.error("Session listing failed:", error.message);
+    res.status(500).json({ message: "Could not load linked devices." });
+  }
+};
+
+export const revokeSession = async (req, res) => {
+  try {
+    const session = await DeviceSession.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user._id, revokedAt: null },
+      { $set: { revokedAt: new Date() } }, { new: true }
+    );
+    if (!session) return res.status(404).json({ message: "Device session not found." });
+    await PushDevice.deleteMany({ sessionId: session._id });
+    res.status(200).json({ message: "Device signed out." });
+  } catch (error) {
+    console.error("Session revoke failed:", error.message);
+    res.status(500).json({ message: "Could not sign out device." });
+  }
+};
+
+export const logoutAll = async (req, res) => {
+  try {
+    await DeviceSession.updateMany({ userId: req.user._id, revokedAt: null }, { $set: { revokedAt: new Date() } });
+    await PushDevice.deleteMany({ userId: req.user._id });
+    clearAuthCookie(res);
+    res.status(200).json({ message: "All devices signed out." });
+  } catch (error) {
+    console.error("Logout-all failed:", error.message);
+    res.status(500).json({ message: "Could not sign out all devices." });
+  }
 };
 
 export const updateProfile = async (req, res) => {

@@ -9,6 +9,7 @@ import SettingsPage from "./pages/SettingsPage";
 import OtpVerifyPage from "./pages/OtpVerifyPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import PublicProfilePage from "./pages/PublicProfilePage";
 import { useAuthStore } from "./store/useAuthStore";
 import { useChatStore } from "./store/useChatStore";
 import { useGroupStore } from "./store/useGroupStore";
@@ -41,6 +42,7 @@ function App() {
   // centred app shell: the logged-out landing page, plus the legal pages, which
   // stay full-bleed for logged-in and logged-out visitors alike.
   const isFullBleed =
+    location.pathname.startsWith("/u/") ||
     location.pathname === "/privacy" ||
     location.pathname === "/terms" ||
     (!authUser && location.pathname === "/");
@@ -186,6 +188,7 @@ function App() {
       }
     >
       <Routes>
+        <Route path="/u/:username" element={<PublicProfilePage />} />
         <Route path="/" element={authUser ? <ChatPage /> : <LandingPage />} />
 
         {/* Public marketing/legal pages — reachable whether or not you're signed in. */}
@@ -195,7 +198,10 @@ function App() {
           path="/login"
           element={
             authUser ? (
-              <Navigate to={"/"} />
+              <Navigate to={(() => {
+                const redirect = new URLSearchParams(location.search).get("redirect");
+                return redirect?.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+              })()} replace />
             ) : pendingVerificationEmail ? (
               <OtpVerifyPage />
             ) : (

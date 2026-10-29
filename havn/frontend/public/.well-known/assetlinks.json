@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.kairosva.havn",
+      "sha256_cert_fingerprints": ["TODO: SHA-256 certificate fingerprint after first signed build"]
+    }
+  }
+]

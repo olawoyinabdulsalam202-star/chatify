@@ -2,9 +2,22 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import User from "../modules/User.js";
 import { ENV } from "../lib/env.js";
+import { bearerSessionFromRequest } from "../lib/deviceSessions.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
+    const bearerToken = /^Bearer\s+/i.test(req.headers.authorization || "");
+    if (bearerToken) {
+      const session = await bearerSessionFromRequest(req);
+      if (!session) return res.status(401).json({ message: "Unauthorized - Invalid or expired token" });
+      const user = await User.findById(session.userId).select("-password");
+      if (!user) return res.status(401).json({ message: "Unauthorized - User not found" });
+      if (user.isBanned) return res.status(403).json({ message: "Your account has been banned." });
+      req.user = user;
+      req.session = session;
+      return next();
+    }
+
     const token = req.cookies.jwt;
     if (!token) return res.status(401).json({ message: "Unauthorized - No token provided" });
 
@@ -33,6 +46,7 @@ export const protectRoute = async (req, res, next) => {
     }
 
     req.user = user;
+    req.session = null;
     next();
   } catch (error) {
     console.log("Error in protectRoute middleware:", error);

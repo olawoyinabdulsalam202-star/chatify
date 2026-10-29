@@ -11,6 +11,7 @@ import {
   HelpCircleIcon,
   LogOutIcon,
   ChevronRightIcon,
+  MonitorSmartphoneIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
@@ -68,6 +69,7 @@ const SECTIONS = [
     Icon: BellIcon,
   },
   { key: "help", title: "Help", description: "About Havn, terms and privacy", Icon: HelpCircleIcon },
+  { key: "devices", title: "Linked devices", description: "Review and sign out of devices", Icon: MonitorSmartphoneIcon },
 ];
 
 function SettingsPage() {
@@ -95,6 +97,8 @@ function SettingsPage() {
   // Live backend diagnostics for the About screen. null until fetched, then one
   // of { loading }, { enabled, hasKey }, or { error }.
   const [pushDiag, setPushDiag] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState("");
@@ -218,6 +222,27 @@ function SettingsPage() {
       cancelled = true;
     };
   }, [section]);
+
+  useEffect(() => {
+    if (section !== "devices") return;
+    let active = true;
+    setSessionsLoading(true);
+    axiosInstance.get("/auth/sessions").then(({ data }) => {
+      if (active) setSessions(Array.isArray(data) ? data : []);
+    }).catch((error) => toast.error(error.response?.data?.message || "Couldn't load linked devices"))
+      .finally(() => { if (active) setSessionsLoading(false); });
+    return () => { active = false; };
+  }, [section]);
+
+  const revokeDevice = async (id) => {
+    try {
+      await axiosInstance.delete(`/auth/sessions/${id}`);
+      setSessions((current) => current.filter((item) => item._id !== id));
+      toast.success("Device signed out");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Couldn't sign out device");
+    }
+  };
 
   // Each sub-page saves only its own slice. The server merges via dot-notation,
   // so leaving a field out never wipes the others.
@@ -618,6 +643,21 @@ function SettingsPage() {
     </div>
   );
 
+  const renderDevices = () => (
+    <div className="space-y-3">
+      {sessionsLoading ? <p className="text-sm text-slate-400">Loading linked devices...</p> : sessions.length ? sessions.map((device) => (
+        <div key={device._id} className="flex items-center gap-3 rounded-xl border border-slate-700/50 bg-slate-800/40 p-4">
+          <MonitorSmartphoneIcon className="h-5 w-5 shrink-0 text-cyan-400" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-slate-100">{device.deviceName || device.platform}</p>
+            <p className="truncate text-xs text-slate-500">Last active {new Date(device.lastUsedAt).toLocaleString()}</p>
+          </div>
+          <button type="button" onClick={() => revokeDevice(device._id)} className="min-h-10 shrink-0 rounded-lg px-3 text-sm text-red-400 hover:bg-red-500/10">Revoke</button>
+        </div>
+      )) : <p className="text-sm text-slate-500">No linked mobile devices.</p>}
+    </div>
+  );
+
   const renderSection = () => {
     switch (section) {
       case "account":
@@ -630,6 +670,8 @@ function SettingsPage() {
         return renderNotifications();
       case "help":
         return renderHelp();
+      case "devices":
+        return renderDevices();
       default:
         return null;
     }

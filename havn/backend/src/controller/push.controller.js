@@ -1,6 +1,7 @@
 import PushSubscription from "../modules/PushSubscription.js";
 import { ENV } from "../lib/env.js";
 import { isPushConfigured, initPush, sendPushToUser } from "../lib/push.js";
+import PushDevice from "../modules/PushDevice.js";
 
 // The browser needs the server's VAPID public key before it can subscribe, and
 // it must be the exact key this server signs with. Serving it from here (rather
@@ -65,9 +66,43 @@ export const sendTestPush = async (req, res) => {
     body: "Notifications are working on this device.",
     url: "/settings/notifications",
     tag: "havn-push-test",
+    senderName: "Havn",
+    kind: "dm",
+    chatId: "settings",
   });
   res.status(result?.sent ? 200 : 503).json({
     message: result?.sent ? "Test notification sent." : "No test notification was sent.",
     ...result,
   });
+};
+
+export const registerAndroidDevice = async (req, res) => {
+  try {
+    const { fcmToken, appVersion = "" } = req.body || {};
+    if (!req.session) return res.status(400).json({ message: "A mobile device session is required." });
+    if (typeof fcmToken !== "string" || fcmToken.length < 20 || fcmToken.length > 4096) return res.status(400).json({ message: "Invalid FCM token." });
+    await PushDevice.findOneAndUpdate({ fcmToken }, {
+      userId: req.user._id,
+      sessionId: req.session._id,
+      platform: "android",
+      fcmToken,
+      appVersion: String(appVersion).slice(0, 64),
+      lastSeenAt: new Date(),
+    }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    res.status(201).json({ message: "Android device registered." });
+  } catch (error) {
+    console.error("Android device registration failed:", error.message);
+    res.status(500).json({ message: "Could not register Android device." });
+  }
+};
+
+export const removeAndroidDevice = async (req, res) => {
+  try {
+    if (!req.session) return res.status(400).json({ message: "A mobile device session is required." });
+    await PushDevice.deleteMany({ userId: req.user._id, sessionId: req.session._id });
+    res.status(200).json({ message: "Android device removed." });
+  } catch (error) {
+    console.error("Android device removal failed:", error.message);
+    res.status(500).json({ message: "Could not remove Android device." });
+  }
 };

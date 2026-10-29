@@ -303,6 +303,9 @@ export const sendMessage = async (req, res) => {
       url: `/?dm=${senderId}`,
       messageId: String(newMessage._id),
       senderId: String(senderId),
+      senderName: req.user.fullName,
+      avatarUrl: req.user.profilePic || "",
+      chatId: String(senderId),
       kind: "dm",
       // Shown as the notification's icon so it reads like a real message from
       // a person (Telegram-style) instead of a generic app notification.

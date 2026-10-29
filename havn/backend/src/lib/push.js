@@ -1,5 +1,6 @@
 import { ENV } from "./env.js";
 import PushSubscription from "../modules/PushSubscription.js";
+import PushDevice from "../modules/PushDevice.js";
 
 // Web Push delivers a notification to a device even when the app is closed —
 // that's the whole point of it over a socket event, which only works while a tab
@@ -11,6 +12,8 @@ import PushSubscription from "../modules/PushSubscription.js";
 // the app still works, it just won't notify a closed device.
 let configured = false;
 let webpush = null;
+let firebaseAdmin = null;
+let fcmInitializationAttempted = false;
 
 // `web-push` is loaded dynamically, and a missing module is treated exactly like
 // missing VAPID keys: push turns itself off and everything else keeps working.
@@ -20,6 +23,7 @@ let webpush = null;
 // entire API on boot with a module-not-found error. Notifications are an
 // enhancement; they must never be able to take messaging down with them.
 export async function initPush() {
+  await initFcm();
   if (!ENV.VAPID_PUBLIC_KEY || !ENV.VAPID_PRIVATE_KEY) {
     console.warn(
       "Web Push disabled: VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY are not set. " +
@@ -61,6 +65,28 @@ export async function initPush() {
   }
 }
 
+async function initFcm() {
+  if (fcmInitializationAttempted) return firebaseAdmin;
+  fcmInitializationAttempted = true;
+  if (!ENV.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+    console.warn("FCM disabled: FIREBASE_SERVICE_ACCOUNT_BASE64 is not set.");
+    return null;
+  }
+  try {
+    const mod = await import("firebase-admin");
+    firebaseAdmin = mod.default || mod;
+    if (!firebaseAdmin.apps?.length) {
+      const serviceAccount = JSON.parse(Buffer.from(ENV.FIREBASE_SERVICE_ACCOUNT_BASE64, "base64").toString("utf8"));
+      firebaseAdmin.initializeApp({ credential: firebaseAdmin.credential.cert(serviceAccount) });
+    }
+    console.log("FCM enabled.");
+    return firebaseAdmin;
+  } catch (error) {
+    console.warn("FCM disabled: could not initialize Firebase Admin:", error.message);
+    return null;
+  }
+}
+
 export function isPushConfigured() {
   return configured;
 }
@@ -74,32 +100,24 @@ export async function sendPushToUser(userId, payload) {
   // import in server.js has completed. Wait once here instead of dropping that
   // first notification.
   if (!configured) await initPush();
-  if (!configured || !webpush || !userId) {
+  if (!userId) {
     // Silence here was the problem: a missing package, missing keys, or a
     // never-subscribed device all produced exactly nothing in the logs, so
     // "no notification arrived" was impossible to diagnose from the server.
-    const reason = !userId ? "missing user id" : "push is not configured";
-    console.log(`Push skipped for ${userId || "unknown user"}: ${reason} (webpush=${Boolean(webpush)})`);
+    const reason = "missing user id";
+    console.log(`Push skipped: ${reason}`);
     return { sent: 0, skipped: reason };
   }
 
   try {
-    const subs = await PushSubscription.find({ userId });
-    if (subs.length === 0) {
-      console.log(
-        `Push skipped for ${userId}: no subscribed devices. ` +
-          "The user has to enable notifications in Settings on that device first."
-      );
-      return { sent: 0, skipped: "no subscribed devices" };
-    }
-
-    const body = JSON.stringify(payload);
     let sent = 0;
     let pruned = 0;
     let failed = 0;
-
-    await Promise.all(
-      subs.map(async (sub) => {
+    let subs = [];
+    if (configured && webpush) {
+      subs = await PushSubscription.find({ userId });
+      const body = JSON.stringify(payload);
+      await Promise.all(subs.map(async (sub) => {
         try {
           await webpush.sendNotification(
             {
@@ -133,11 +151,54 @@ export async function sendPushToUser(userId, payload) {
             );
           }
         }
-      })
-    );
+      }));
+    } else {
+      console.log(`Web push skipped for ${userId}: ${configured ? "web-push transport unavailable" : "VAPID is not configured"}`);
+    }
 
-    console.log(`Push to ${userId}: ${sent} sent, ${pruned} pruned, ${subs.length} total`);
-    return { sent, pruned, failed, total: subs.length };
+    const devices = await PushDevice.find({ userId }).select("_id fcmToken").lean();
+    const admin = devices.length ? await initFcm() : null;
+    let fcmSent = 0;
+    let fcmPruned = 0;
+    if (admin && devices.length) {
+      const sender = payload.senderName || payload.title || "Havn";
+      const data = Object.fromEntries(Object.entries({
+        senderName: sender,
+        avatarUrl: payload.avatarUrl || payload.icon || "",
+        body: payload.body || "New message",
+        chatId: payload.chatId || payload.groupId || payload.senderId || "",
+        kind: payload.kind || "dm",
+        tag: payload.tag || "havn-message",
+      }).map(([key, value]) => [key, String(value)]));
+      const call = payload.kind === "call";
+      await Promise.all(devices.map(async (device) => {
+        try {
+          await admin.messaging().send({
+            token: device.fcmToken,
+            data,
+            android: { priority: "high", ttl: call ? 30_000 : 86_400_000 },
+          });
+          fcmSent += 1;
+        } catch (error) {
+          const code = error.code || "";
+          if (["messaging/registration-token-not-registered", "messaging/invalid-argument"].includes(code)) {
+            await PushDevice.deleteOne({ _id: device._id }).catch(() => {});
+            fcmPruned += 1;
+          } else {
+            failed += 1;
+            console.error(`FCM send failed for ${userId} (${code}):`, error.message);
+          }
+        }
+      }));
+    } else if (!devices.length) {
+      console.log(`FCM push skipped for ${userId}: no Android device tokens.`);
+    } else {
+      console.log(`FCM push skipped for ${userId}: FCM is unavailable or not configured.`);
+    }
+    const totalSent = sent + fcmSent;
+    if (!subs.length && !devices.length) console.log(`Push skipped for ${userId}: no subscribed web or Android devices.`);
+    console.log(`Push to ${userId}: web=${sent}, fcm=${fcmSent}, pruned=${pruned + fcmPruned}, failed=${failed}`);
+    return { sent: totalSent, webSent: sent, fcmSent, pruned: pruned + fcmPruned, failed, total: subs.length + devices.length };
   } catch (error) {
     console.log("sendPushToUser error:", error.message);
     return { sent: 0, failed: 1, error: error.message };

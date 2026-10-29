@@ -659,7 +659,10 @@ export const sendGroupMessage = async (req, res) => {
         url: `/?group=${groupId}`,
         messageId: String(newMessage._id),
         senderId: String(senderId),
+        senderName: req.user.fullName,
+        avatarUrl: req.user.profilePic || "",
         groupId: String(groupId),
+        chatId: String(groupId),
         kind: "group",
         // The sender's face, not the group icon — matches who actually sent
         // this particular message, the same as the DM notification.
