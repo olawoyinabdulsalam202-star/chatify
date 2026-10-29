@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "Havn",
+    "slug": "havn",
+    "scheme": "havn",
+    "version": "1.0.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Havn to scan a web login QR code."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Havn to choose a photo to send in chat."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "messages",
+          "color": "#C2410C"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "android": {
+      "package": "com.kairosva.havn",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FAF7F2"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "havn.kairos-va.com", "pathPrefix": "/u/" },
+            { "scheme": "https", "host": "havn.kairos-va.com", "pathPrefix": "/qr/" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    }
+  }
+}

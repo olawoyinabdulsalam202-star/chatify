@@ -3,5 +3,7 @@ node_modules
 **/google-services.json
 **/*service-account*.json
 **/*.keystore
+mobile/.env
+mobile/google-services.json
 frontend/responsive-shots/
 .env

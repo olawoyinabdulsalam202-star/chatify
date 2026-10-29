@@ -1,9 +1,10 @@
-import aj from "../lib/arcjet.js";
+import aj, { ajMobile } from "../lib/arcjet.js";
 import { isSpoofedBot } from "@arcjet/inspect";
 
 export const arcjetProtection = async (req, res, next) => {
   try {
-    const decision = await aj.protect(req);
+    const protection = req.get("x-client") === "havn-mobile" ? ajMobile : aj;
+    const decision = await protection.protect(req);
 
     if (decision.isDenied()) {
       if (decision.reason.isRateLimit()) {

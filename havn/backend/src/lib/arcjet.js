@@ -28,4 +28,17 @@ const aj = arcjet({
   ],
 });
 
+const ajMobile = arcjet({
+  key: ENV.ARCJET_KEY,
+  rules: [
+    shield({ mode: "LIVE" }),
+    slidingWindow({
+      mode: "LIVE",
+      max: 100,
+      interval: 60,
+    }),
+  ],
+});
+
+export { ajMobile };
 export default aj;
