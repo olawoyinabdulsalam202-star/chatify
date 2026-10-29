@@ -44,7 +44,7 @@ function CreateGroupModal({ onClose }) {
   return (
     <div className="responsive-modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-lg w-full max-w-md max-h-[100dvh] md:max-h-[80vh] flex flex-col overflow-hidden"
+        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-lg w-full max-w-md max-h-none md:max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-slate-700/50">

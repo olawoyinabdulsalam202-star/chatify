@@ -58,6 +58,36 @@ function AssistantChat() {
     previousCountRef.current = messages.length;
   }, [messages, isSending]);
 
+  useEffect(() => {
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let preserveBottom = false;
+    const keepLatestVisible = () => {
+      if (!firstFrame && !secondFrame) preserveBottom = nearBottomRef.current;
+      if (!preserveBottom) return;
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+      firstFrame = requestAnimationFrame(() => {
+        firstFrame = 0;
+        secondFrame = requestAnimationFrame(() => {
+          const pane = scrollRef.current;
+          if (pane) pane.scrollTop = pane.scrollHeight;
+          secondFrame = 0;
+          preserveBottom = false;
+        });
+      });
+    };
+    const viewport = window.visualViewport;
+    window.addEventListener("resize", keepLatestVisible);
+    viewport?.addEventListener("resize", keepLatestVisible);
+    return () => {
+      window.removeEventListener("resize", keepLatestVisible);
+      viewport?.removeEventListener("resize", keepLatestVisible);
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, []);
+
   const handleSend = (event) => {
     event?.preventDefault();
     if (!text.trim() || isSending) return;
@@ -219,7 +249,7 @@ function AssistantChat() {
         </div>
       </div>
 
-      <form onSubmit={handleSend} className="shrink-0 border-t border-slate-700/50 p-3 sm:px-6 sm:py-4">
+      <form onSubmit={handleSend} className="chat-input-bar shrink-0 border-t border-slate-700/50 p-3 sm:px-6 sm:py-4">
         <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-xl border border-slate-700 bg-slate-800/60 p-2 focus-within:border-cyan-500">
           <textarea
             value={text}

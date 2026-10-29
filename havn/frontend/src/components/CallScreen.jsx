@@ -87,7 +87,7 @@ function CallScreen() {
   const isVideo = callType === "video";
 
   return (
-    <div className="fixed inset-0 h-[100dvh] bg-black z-[60] flex flex-col items-center justify-center pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+    <div className="fixed inset-0 h-[var(--app-h,100dvh)] md:h-[100dvh] bg-black z-[60] flex flex-col items-center justify-center pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {isVideo ? (
         <>
           <video 

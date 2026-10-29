@@ -105,7 +105,7 @@ function ChatPage() {
   };
 
   const resetSidebarWidth = () => {
-    const defaultWidth = clampWidth(380);
+    const defaultWidth = clampWidth(Math.max(320, Math.round(window.innerWidth * 0.38)));
     setWidth(defaultWidth);
     persistWidth(defaultWidth);
   };
@@ -171,18 +171,16 @@ function ChatPage() {
   const showingChat = Boolean(selectedUser || showingGroup || assistantOpen);
   const showAssistantButton = !selectedUser && !showingGroup && !assistantOpen;
 
-  // Height tracks App.jsx's padding (p-2 on mobile, sm:p-4 above) so the chat
-  // fills the screen without overflowing it. 100dvh — not 100vh — because vh on
-  // mobile means the viewport with the URL bar hidden, which pushes the message
-  // input off-screen until you scroll.
+  // The app-height variable follows the visible viewport as browser chrome or
+  // the soft keyboard changes the available height.
   return (
-    <div className="relative w-full max-w-6xl md:max-w-none min-h-0 h-full max-h-[920px]">
+    <div className="relative w-full max-w-6xl md:max-w-none min-h-0 h-[var(--app-h,100dvh)] max-h-none md:h-full md:max-h-[920px]">
       <Panel
-        className="md:grid md:grid-cols-[var(--sidebar-w)_6px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]"
+        className="rounded-none border-0 md:rounded-2xl md:border md:grid md:grid-cols-[var(--sidebar-w)_6px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]"
         style={{ "--sidebar-w": `${sidebarWidth}px` }}
       >
         {/* LEFT SIDE - hidden on mobile when chat is open */}
-        <div className={`relative ${showingChat ? "hidden md:flex" : "flex"} min-h-0 min-w-0 w-full md:w-auto bg-slate-800 flex-col`}>
+        <div className={`relative ${showingChat ? "hidden md:flex" : "flex"} min-h-0 min-w-0 w-full md:w-auto bg-slate-800 flex-col pt-[env(safe-area-inset-top)] md:pt-0`}>
           <div className="shrink-0"><ProfileHeader /></div>
           <div className="shrink-0"><StoryTray /></div>
           <div className="shrink-0"><ActiveTabSwitch /></div>
@@ -224,7 +222,7 @@ function ChatPage() {
         </div>
 
         {/* RIGHT SIDE - hidden on mobile when no chat selected */}
-        <div className={`${showingChat ? "flex" : "hidden md:flex"} min-w-0 min-h-0 w-full md:w-auto flex-1 flex-col bg-slate-900`}>
+        <div className={`${showingChat ? "flex" : "hidden md:flex"} min-w-0 min-h-0 w-full md:w-auto flex-1 flex-col bg-slate-900 pt-[env(safe-area-inset-top)] md:pt-0`}>
           {assistantOpen ? (
             <AssistantChat />
           ) : selectedUser ? (

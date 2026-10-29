@@ -13,7 +13,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useChatStore } from "./store/useChatStore";
 import { useGroupStore } from "./store/useGroupStore";
 import { useCallStore } from "./store/useCallStore";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import PageLoader from "./components/PageLoader";
 import IncomingCallModal from "./components/IncomingCallModal";
 import CallScreen from "./components/CallScreen";
@@ -44,6 +44,7 @@ function App() {
     location.pathname === "/privacy" ||
     location.pathname === "/terms" ||
     (!authUser && location.pathname === "/");
+  const isChatScreen = Boolean(authUser && location.pathname === "/");
 
   useEffect(() => {
     checkAuth();
@@ -163,6 +164,11 @@ function App() {
     document.body.dataset.fullbleed = isFullBleed ? "true" : "false";
   }, [isFullBleed]);
 
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("chat-screen-mounted", isChatScreen);
+    return () => document.documentElement.classList.remove("chat-screen-mounted");
+  }, [isChatScreen]);
+
   if (isCheckingAuth) return <PageLoader />;
 
   return (
@@ -170,6 +176,10 @@ function App() {
       className={
         isFullBleed
           ? `min-h-[100dvh] overflow-x-hidden font-size-${authUser?.settings?.fontSize || "medium"}`
+          : isChatScreen
+          ? `h-[var(--app-h,100dvh)] min-h-0 bg-slate-900 relative flex items-center justify-center p-0 overflow-hidden md:h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:p-4 font-size-${
+              authUser?.settings?.fontSize || "medium"
+            }`
           : `h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-0 bg-slate-900 relative flex items-center justify-center p-2 sm:p-4 overflow-hidden font-size-${
               authUser?.settings?.fontSize || "medium"
             }`

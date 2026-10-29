@@ -289,9 +289,9 @@ function StoryViewerModal() {
   const blurredImage = story.image ? cloudinaryTransform(story.image, "w_40,e_blur:800,q_30") : "";
 
   return (
-    <div className="fixed inset-0 h-[100dvh] bg-black z-50 flex items-center justify-center" onContextMenu={(event) => event.preventDefault()}>
+    <div className="fixed inset-0 h-[var(--app-h,100dvh)] md:h-[100dvh] bg-black z-50 flex items-center justify-center" onContextMenu={(event) => event.preventDefault()}>
       <div
-        className="relative w-full max-w-sm h-full sm:h-[90dvh] sm:rounded-xl overflow-hidden select-none"
+        className="relative w-full max-w-sm h-full md:h-[90dvh] md:rounded-xl overflow-hidden select-none"
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}

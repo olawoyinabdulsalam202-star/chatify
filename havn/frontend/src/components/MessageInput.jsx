@@ -187,7 +187,7 @@ function MessageInput() {
   };
 
   return (
-    <div className="shrink-0 p-2 sm:p-4 border-t border-slate-700/50">
+    <div className="chat-input-bar shrink-0 p-2 sm:p-4 border-t border-slate-700/50">
       {replyTarget && (
         <div className="max-w-3xl mx-auto mb-3 flex items-center justify-between bg-slate-800/60 border-l-4 border-cyan-500 rounded-r-lg px-3 py-2">
           <div className="flex items-start gap-2 min-w-0">

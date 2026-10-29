@@ -56,7 +56,7 @@ function CreateStoryModal({ onClose }) {
 
   return (
     <div className="responsive-modal-backdrop fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-      <div className="responsive-modal-panel bg-slate-800 rounded-xl w-full max-w-sm max-h-[100dvh] md:max-h-[90vh] overflow-y-auto overscroll-contain border border-slate-700">
+      <div className="responsive-modal-panel bg-slate-800 rounded-xl w-full max-w-sm max-h-none md:max-h-[90vh] overflow-y-auto overscroll-contain border border-slate-700">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
           <h3 className="text-slate-200 font-medium">Create story</h3>
           <button onClick={onClose} className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 grid place-items-center text-slate-400 hover:text-slate-200" aria-label="Close">

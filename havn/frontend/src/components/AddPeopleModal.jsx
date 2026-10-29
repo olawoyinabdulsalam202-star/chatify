@@ -74,7 +74,7 @@ function AddPeopleModal() {
       onClick={closeAddPeople}
     >
       <div
-        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[100dvh] md:max-h-[70vh] flex flex-col overflow-hidden"
+        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-none md:max-h-[70vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 p-3 sm:p-4 border-b border-slate-700">

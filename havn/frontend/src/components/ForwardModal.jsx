@@ -35,7 +35,7 @@ function ForwardModal({ message, onClose }) {
       onClick={onClose}
     >
       <div
-        className="responsive-modal-panel bg-slate-900 border border-slate-700 rounded-lg w-full max-w-sm max-h-[100dvh] md:max-h-96 flex flex-col overflow-hidden"
+        className="responsive-modal-panel bg-slate-900 border border-slate-700 rounded-lg w-full max-w-sm max-h-none md:max-h-96 flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-slate-700">

@@ -91,6 +91,7 @@ body.sidebar-resizing img {
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
   --user-font-family: inherit;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .input {
@@ -144,6 +145,18 @@ body {
 body[data-fullbleed="false"] {
   height: 100dvh;
   overflow: hidden;
+}
+
+html.chat-screen-mounted,
+html.chat-screen-mounted body,
+html.chat-screen-mounted #root {
+  height: var(--app-h, 100dvh);
+  min-height: 0;
+  overflow: hidden;
+}
+
+html.chat-screen-mounted body {
+  padding: 0;
 }
 
 /* Keep the app clear of the notch and the home indicator. Paired with
@@ -329,14 +342,19 @@ pre,
 }
 
 @media (max-width: 767px) {
+  .chat-input-bar {
+    padding-bottom: max(var(--safe-area-bottom), 8px);
+  }
+
   .responsive-modal-backdrop {
     padding: 0;
+    height: var(--app-h, 100dvh);
   }
 
   .responsive-modal-panel {
     width: 100%;
-    height: 100%;
-    max-height: 100dvh;
+    height: var(--app-h, 100dvh);
+    max-height: var(--app-h, 100dvh);
     border-radius: 0;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);

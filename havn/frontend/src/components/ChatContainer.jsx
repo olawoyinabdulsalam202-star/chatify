@@ -141,6 +141,36 @@ function ChatContainer() {
     prevCountRef.current = messages.length;
   }, [messages, typingUserId]);
 
+  useEffect(() => {
+    let firstFrame = 0;
+    let secondFrame = 0;
+    let preserveBottom = false;
+    const keepLatestVisible = () => {
+      if (!firstFrame && !secondFrame) preserveBottom = nearBottomRef.current;
+      if (!preserveBottom) return;
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+      firstFrame = requestAnimationFrame(() => {
+        firstFrame = 0;
+        secondFrame = requestAnimationFrame(() => {
+          const container = scrollContainerRef.current;
+          if (container) container.scrollTop = container.scrollHeight;
+          secondFrame = 0;
+          preserveBottom = false;
+        });
+      });
+    };
+    const viewport = window.visualViewport;
+    window.addEventListener("resize", keepLatestVisible);
+    viewport?.addEventListener("resize", keepLatestVisible);
+    return () => {
+      window.removeEventListener("resize", keepLatestVisible);
+      viewport?.removeEventListener("resize", keepLatestVisible);
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, []);
+
   // Smart-cancel: while a message's menu (or quick-reactions) is open, a tap
   // anywhere else on the screen closes it. The menu and its trigger stop click
   // propagation, so only taps outside them reach this document listener.
@@ -502,7 +532,7 @@ function ChatContainer() {
 
       {fullMedia && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:p-4"
+          className="fixed inset-0 h-[var(--app-h,100dvh)] md:h-auto bg-black/90 z-50 flex items-center justify-center p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+0.75rem)] md:p-4"
           onClick={() => setFullMedia(null)}
         >
           <button

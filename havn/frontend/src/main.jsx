@@ -5,11 +5,13 @@ import App from './App.jsx'
 import { BrowserRouter } from 'react-router'
 import { initAudioUnlock } from './lib/audioUnlock'
 import { syncPushSubscription } from './lib/push'
+import { initializeAppHeight } from './hooks/useAppHeight'
 
 // Start listening for the first tap/keypress straight away. Autoplay permission
 // for the ringtone has to be earned from a real user gesture, and an incoming
 // call never gets one of its own — so we bank it here, at startup.
 initAudioUnlock()
+initializeAppHeight()
 
 document.addEventListener("contextmenu", (event) => {
   if (event.target instanceof Element && event.target.matches("img, video")) {

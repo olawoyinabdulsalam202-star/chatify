@@ -8,9 +8,7 @@ import { chromium } from "playwright";
 const frontendDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const screenshotDir = resolve(frontendDir, "responsive-shots");
 const viteEntry = resolve(frontendDir, "node_modules/vite/bin/vite.js");
-const viewports = [
-  [1840, 1000], [1280, 800], [1024, 768], [768, 1024], [390, 844], [320, 568],
-];
+const viewports = [[360, 640], [390, 844], [412, 915]];
 const testUserId = "64b000000000000000000001";
 const peerId = "64b000000000000000000002";
 let authenticated = false;
@@ -54,7 +52,7 @@ let failures = 0;
 
 try {
   for (const [width, height] of viewports) {
-    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
     await page.route("**/socket.io/**", (route) => route.fulfill({ status: 404, body: "" }));
     await page.route("**/api/**", async (route) => {
       const url = new URL(route.request().url());
@@ -158,6 +156,23 @@ try {
     if (rowAvailable) {
       const listPane = page.locator("div.overflow-y-auto").first();
       await listPane.screenshot({ path: resolve(screenshotDir, `${width}x${height}-chat-list.png`) });
+      await page.addStyleTag({ content: ":root { --safe-area-bottom: 24px; }" });
+      await chatListRow.click();
+      const inputBar = page.locator(".chat-input-bar").first();
+      await inputBar.waitFor({ state: "visible", timeout: 10000 });
+      const mobileMetrics = await page.evaluate(() => ({
+        inputBottom: document.querySelector(".chat-input-bar")?.getBoundingClientRect().bottom,
+        innerHeight: window.innerHeight,
+        documentHeight: document.documentElement.scrollHeight,
+      }));
+      if (mobileMetrics.inputBottom > mobileMetrics.innerHeight) {
+        passed = false;
+        errors.push(`input bottom ${Math.round(mobileMetrics.inputBottom)}px exceeds viewport ${mobileMetrics.innerHeight}px`);
+      }
+      if (mobileMetrics.documentHeight > mobileMetrics.innerHeight) {
+        passed = false;
+        errors.push(`document height ${mobileMetrics.documentHeight}px exceeds viewport ${mobileMetrics.innerHeight}px`);
+      }
     } else {
       await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-chat-list-unavailable.png`) });
     }

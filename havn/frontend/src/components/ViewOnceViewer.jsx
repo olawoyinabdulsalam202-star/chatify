@@ -59,7 +59,7 @@ function ViewOnceViewer({ imageUrl, videoUrl, duration, senderName, onClose }) {
   const pct = total > 0 ? ((total - remaining) / total) * 100 : 100;
 
   return (
-    <div className="fixed inset-0 z-[80] h-[100dvh] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[80] h-[var(--app-h,100dvh)] md:h-[100dvh] bg-black flex flex-col">
       <div className="flex items-center justify-between p-4 pt-[calc(1rem+env(safe-area-inset-top))] text-white">
         <div className="flex items-center gap-2 min-w-0">
           <EyeOffIcon className="w-4 h-4 shrink-0 text-slate-400" />
