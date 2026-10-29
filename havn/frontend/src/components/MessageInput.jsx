@@ -311,7 +311,7 @@ function MessageInput() {
           <button
             type="button"
             onClick={() => setShowPicker((v) => !v)}
-            className={`shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
+            className={`shrink-0 size-10 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
               showPicker ? "text-cyan-400" : ""
             }`}
             aria-label="Emoji, GIFs and stickers"
@@ -324,7 +324,7 @@ function MessageInput() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className={`shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
+            className={`shrink-0 size-10 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
               imagePreview || videoPreview ? "text-cyan-400" : ""
             }`}
             aria-label="Attach a photo or video"
@@ -336,7 +336,7 @@ function MessageInput() {
             <button
               type="submit"
               disabled={!text.trim() && !hasAttachment}
-              className="shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="shrink-0 size-10 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Send"
             >
               <SendIcon className="w-5 h-5" />
@@ -345,7 +345,7 @@ function MessageInput() {
             <button
               type="button"
               onClick={() => setIsRecordingVoice(true)}
-              className="shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
+              className="shrink-0 size-10 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
               title="Record a voice note"
               aria-label="Record a voice note"
             >

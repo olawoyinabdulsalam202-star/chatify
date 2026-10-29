@@ -87,7 +87,7 @@ function CallScreen() {
   const isVideo = callType === "video";
 
   return (
-    <div className="fixed inset-0 bg-black z-[60] flex flex-col items-center justify-center">
+    <div className="fixed inset-0 h-[100dvh] bg-black z-[60] flex flex-col items-center justify-center pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
       {isVideo ? (
         <>
           <video 
@@ -117,7 +117,7 @@ function CallScreen() {
         </button>
       )}
 
-      <div className="absolute top-8 left-0 right-0 text-center z-10">
+      <div className="absolute top-[calc(env(safe-area-inset-top)+1rem)] left-0 right-0 text-center z-10 px-3">
         {!isVideo && (
           <img 
             src={peer.avatar || "/avatar.svg"}
@@ -134,7 +134,7 @@ function CallScreen() {
         </p>
       </div>
 
-      <div className="absolute bottom-10 flex items-center gap-6 z-10">
+      <div className="absolute bottom-[calc(env(safe-area-inset-bottom)+1.5rem)] flex items-center gap-3 sm:gap-6 z-10">
         <button
           onClick={toggleMute}
           className={`size-14 rounded-full flex items-center justify-center transition-colors ${

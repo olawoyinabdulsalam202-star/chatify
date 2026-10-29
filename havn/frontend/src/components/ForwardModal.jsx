@@ -31,16 +31,16 @@ function ForwardModal({ message, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+      className="responsive-modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-lg w-full max-w-sm max-h-96 flex flex-col"
+        className="responsive-modal-panel bg-slate-900 border border-slate-700 rounded-lg w-full max-w-sm max-h-[100dvh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <h3 className="text-slate-200 font-medium">Forward to…</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-300">
+          <button onClick={onClose} className="min-w-10 min-h-10 grid place-items-center text-slate-500 hover:text-slate-300" aria-label="Close">
             <XIcon className="w-5 h-5" />
           </button>
         </div>

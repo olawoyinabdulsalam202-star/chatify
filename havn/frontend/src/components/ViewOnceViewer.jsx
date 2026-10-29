@@ -59,7 +59,7 @@ function ViewOnceViewer({ imageUrl, videoUrl, duration, senderName, onClose }) {
   const pct = total > 0 ? ((total - remaining) / total) * 100 : 100;
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black flex flex-col">
+    <div className="fixed inset-0 z-[80] h-[100dvh] bg-black flex flex-col">
       <div className="flex items-center justify-between p-4 pt-[calc(1rem+env(safe-area-inset-top))] text-white">
         <div className="flex items-center gap-2 min-w-0">
           <EyeOffIcon className="w-4 h-4 shrink-0 text-slate-400" />
@@ -84,7 +84,7 @@ function ViewOnceViewer({ imageUrl, videoUrl, duration, senderName, onClose }) {
             </svg>
             <span className="text-[10px] font-medium tabular-nums text-white">{remaining}</span>
           </div>
-          <button onClick={closeOnce} aria-label="Close" className="text-white/80 hover:text-white">
+          <button onClick={closeOnce} aria-label="Close" className="min-w-10 min-h-10 grid place-items-center text-white/80 hover:text-white">
             <XIcon className="w-6 h-6" />
           </button>
         </div>

@@ -30,8 +30,8 @@ function ResetPasswordPage() {
   };
 
   return (
-    <div className="w-full flex items-center justify-center p-4 bg-slate-900">
-      <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800 p-8 flex flex-col items-center">
+    <div className="h-full min-h-0 w-full overflow-y-auto overscroll-contain flex items-center justify-center p-2 sm:p-4 bg-slate-900">
+      <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-800 p-5 sm:p-8 flex flex-col items-center">
         <Logo variant="mark" size={44} className="mb-5" />
         <h2 className="text-2xl font-bold text-slate-100 mb-2">Enter your code</h2>
         <p className="text-slate-400 text-center mb-6">

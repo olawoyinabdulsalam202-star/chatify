@@ -308,7 +308,7 @@ function GroupMessageInput() {
           <button
             type="button"
             onClick={() => setShowPicker((v) => !v)}
-            className={`shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
+            className={`shrink-0 size-10 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
               showPicker ? "text-cyan-400" : ""
             }`}
             aria-label="Emoji, GIFs and stickers"
@@ -320,7 +320,7 @@ function GroupMessageInput() {
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className={`shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
+            className={`shrink-0 size-10 sm:size-11 flex items-center justify-center bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg transition-colors ${
               imagePreview || videoPreview ? "text-cyan-400" : ""
             }`}
             aria-label="Attach a photo or video"
@@ -331,7 +331,7 @@ function GroupMessageInput() {
           {text.trim() || hasAttachment ? (
             <button
               type="submit"
-              className="shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
+              className="shrink-0 size-10 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
               aria-label="Send"
             >
               <SendIcon className="w-5 h-5" />
@@ -340,7 +340,7 @@ function GroupMessageInput() {
             <button
               type="button"
               onClick={() => setIsRecordingVoice(true)}
-              className="shrink-0 size-9 max-[360px]:size-8 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
+              className="shrink-0 size-10 sm:size-11 flex items-center justify-center bg-cyan-500 text-white rounded-lg hover:bg-cyan-600 transition-colors"
               title="Record a voice note"
               aria-label="Record a voice note"
             >

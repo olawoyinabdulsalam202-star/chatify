@@ -20,14 +20,14 @@ function StoryTray() {
   }, []);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 overflow-x-auto border-b border-slate-700/50">
+    <div className="story-tray flex items-center gap-3 px-4 py-3 overflow-x-auto overscroll-x-contain border-b border-slate-700/50">
       <button
         onClick={() => (myStories.length > 0 ? openViewer("mine", 0) : setShowCreate(true))}
         className="flex flex-col items-center gap-1 shrink-0"
       >
         <div className="relative">
           <div
-            className={`size-12 rounded-full p-0.5 ${
+            className={`story-avatar size-12 rounded-full p-0.5 ${
               myStories.length > 0 ? "bg-cyan-500" : "bg-slate-700"
             }`}
           >
@@ -42,7 +42,7 @@ function StoryTray() {
               e.stopPropagation();
               setShowCreate(true);
             }}
-            className="absolute -bottom-0.5 -right-0.5 size-5 rounded-full bg-cyan-500 flex items-center justify-center border-2 border-slate-800"
+            className="absolute -bottom-2 -right-2 size-10 rounded-full bg-cyan-500 flex items-center justify-center border-2 border-slate-800"
           >
             <PlusIcon className="w-3 h-3 text-white" />
           </button>
@@ -61,7 +61,7 @@ function StoryTray() {
             className="flex flex-col items-center gap-1 shrink-0"
           >
             <div
-              className={`size-12 rounded-full p-0.5 ${
+              className={`story-avatar size-12 rounded-full p-0.5 ${
                 allViewed ? "bg-slate-700" : "bg-cyan-500"
               }`}
             >

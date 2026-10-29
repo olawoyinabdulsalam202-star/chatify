@@ -183,7 +183,7 @@ function AssistantChat() {
             messages.map((message) => (
               <div key={message._id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <p
-                  className={`chat-bubble max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  className={`chat-bubble max-w-[85%] md:max-w-[70%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     message.role === "user"
                       ? "bg-cyan-600 text-white"
                       : "bg-slate-800 text-slate-100"

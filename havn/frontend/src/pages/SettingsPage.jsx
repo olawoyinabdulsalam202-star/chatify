@@ -636,8 +636,8 @@ function SettingsPage() {
   };
 
   return (
-    <div className="relative z-10 min-h-screen bg-slate-900 text-slate-200 p-4 sm:p-8 overflow-y-auto">
-      <div className="max-w-xl mx-auto">
+    <div className="relative z-10 h-full min-h-0 min-w-0 bg-slate-900 text-slate-200 p-3 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:p-8 overflow-y-auto overscroll-contain">
+      <div className="max-w-xl min-w-0 mx-auto">
         {activeSection ? (
           <>
             <button
@@ -646,7 +646,7 @@ function SettingsPage() {
             >
               <ArrowLeftIcon className="w-5 h-5" /> Settings
             </button>
-            <h1 className="text-2xl font-semibold mb-6">{activeSection.title}</h1>
+            <h1 className="auth-heading font-semibold mb-6">{activeSection.title}</h1>
             {renderSection()}
           </>
         ) : (
@@ -657,7 +657,7 @@ function SettingsPage() {
             >
               <ArrowLeftIcon className="w-5 h-5" /> Back
             </button>
-            <h1 className="text-2xl font-semibold mb-6">Settings</h1>
+            <h1 className="auth-heading font-semibold mb-6">Settings</h1>
 
             <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden divide-y divide-slate-700/50">
               {SECTIONS.map(({ key, title, description, Icon }) => (

@@ -170,7 +170,7 @@ function App() {
       className={
         isFullBleed
           ? `min-h-[100dvh] overflow-x-hidden font-size-${authUser?.settings?.fontSize || "medium"}`
-          : `h-[100dvh] bg-slate-900 relative flex items-center justify-center p-2 sm:p-4 overflow-hidden font-size-${
+          : `h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-0 bg-slate-900 relative flex items-center justify-center p-2 sm:p-4 overflow-hidden font-size-${
               authUser?.settings?.fontSize || "medium"
             }`
       }

@@ -14,13 +14,13 @@ function SignUpPage() {
   };
 
   return (
-    <div className="w-full flex items-center justify-center p-4 bg-slate-900">
-      <div className="w-full max-w-5xl rounded-2xl border border-slate-700 bg-slate-800 overflow-hidden flex flex-col md:flex-row md:min-h-[560px]">
+    <div className="h-full min-h-0 w-full overflow-y-auto overscroll-contain flex items-center justify-center p-2 sm:p-4 bg-slate-900">
+      <div className="w-full min-w-0 max-w-5xl rounded-2xl border border-slate-700 bg-slate-800 overflow-hidden flex flex-col md:flex-row md:min-h-[560px]">
         {/* BRAND SIDE */}
         <div className="hidden md:flex md:w-1/2 bg-cyan-500 text-white p-10 flex-col justify-between order-first">
           <Logo tone="invert" size={40} />
           <div>
-            <h1 className="text-4xl font-bold leading-tight mb-4">Find your quiet corner.</h1>
+            <h1 className="marketing-heading font-bold leading-tight mb-4">Find your quiet corner.</h1>
             <p className="text-white/85 text-lg max-w-sm">
               Set up in seconds. No phone number, no ads, no algorithm deciding what you see.
             </p>
@@ -44,10 +44,10 @@ function SignUpPage() {
         </div>
 
         {/* FORM SIDE */}
-        <div className="md:w-1/2 p-8 sm:p-10 flex items-center justify-center">
+        <div className="min-w-0 md:w-1/2 p-5 sm:p-10 flex items-center justify-center">
           <div className="w-full max-w-md">
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-100 mb-2">Create your account</h2>
+              <h2 className="auth-heading font-bold text-slate-100 mb-2">Create your account</h2>
               <p className="text-slate-400">Join Havn and start talking.</p>
             </div>
 

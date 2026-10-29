@@ -22,8 +22,8 @@ function IncomingCallModal() {
   if (!peer) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-      <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8 w-full max-w-xs text-center">
+    <div className="responsive-modal-backdrop fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+      <div className="incoming-call-panel responsive-modal-panel bg-slate-800 border border-slate-700 rounded-2xl p-5 sm:p-8 w-full max-w-xs text-center">
         <img 
           src={peer.avatar || "/avatar.svg"}
           alt={peer.name}
@@ -41,7 +41,7 @@ function IncomingCallModal() {
         {ringtoneBlocked && (
           <button
             onClick={enableSound}
-            className="mb-6 mx-auto flex items-center gap-2 rounded-full bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs text-slate-200 transition-colors"
+            className="min-h-10 mb-6 mx-auto flex items-center gap-2 rounded-full bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs text-slate-200 transition-colors"
           >
             <VolumeXIcon className="w-4 h-4" />
             Ringtone blocked — tap for sound

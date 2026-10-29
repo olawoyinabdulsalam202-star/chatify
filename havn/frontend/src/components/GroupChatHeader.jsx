@@ -44,12 +44,12 @@ function GroupChatHeader() {
   }, [menuOpen]);
 
   return (
-    <div className="relative flex shrink-0 justify-between items-center bg-slate-800/50 border-b border-slate-700/50 min-h-[72px] max-h-[84px] px-2 sm:px-6">
+    <div className="group-chat-header relative flex shrink-0 justify-between items-center gap-2 bg-slate-800/50 border-b border-slate-700/50 min-h-[64px] px-1.5 sm:px-6 py-1">
       <button
         onClick={() => setShowInfo(true)}
         className="flex items-center space-x-3 text-left flex-1 min-w-0"
       >
-        <span className="md:hidden mr-1" onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>
+        <span role="button" tabIndex={0} className="md:hidden mr-1 shrink-0 min-w-10 min-h-10 grid place-items-center" aria-label="Back to chats" onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setSelectedGroup(null); } }} onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>
           <ArrowLeftIcon className="w-5 h-5 text-slate-400 hover:text-slate-200 transition-colors" />
         </span>
 
@@ -78,7 +78,7 @@ function GroupChatHeader() {
       <div className="relative" ref={menuRef}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className={`text-slate-400 hover:text-slate-200 transition-colors ${menuOpen ? "text-slate-200" : ""}`}
+          className={`min-w-10 min-h-10 grid place-items-center text-slate-400 hover:text-slate-200 transition-colors ${menuOpen ? "text-slate-200" : ""}`}
           aria-label="More options"
         >
           <MoreVerticalIcon className="w-5 h-5" />

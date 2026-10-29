@@ -30,13 +30,13 @@ function ProfileHeader() {
   };
 
   return (
-    <div className="p-3 sm:p-6 border-b border-slate-700/50">
+    <div className="profile-header p-2 sm:p-6 border-b border-slate-700/50">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {/* AVATAR */}
           <div className="avatar online shrink-0">
             <button
-              className="size-14 rounded-full overflow-hidden relative group"
+              className="profile-avatar size-14 rounded-full overflow-hidden relative group"
               onClick={() => fileInputRef.current.click()}
             >
               <img 
@@ -65,29 +65,29 @@ function ProfileHeader() {
               {authUser.isBadged && <VerifiedBadge className="w-4 h-4 shrink-0" />}
             </h3>
 
-            <p className="text-slate-400 text-xs">Online</p>
+            <p className="profile-secondary text-slate-400 text-xs">Online</p>
           </div>
         </div>
 
         {/* BUTTONS */}
-        <div className="flex gap-3 sm:gap-4 items-center shrink-0 pl-2">
+        <div className="profile-header-actions flex gap-2 sm:gap-4 items-center shrink-0 pl-2">
           {/* ADD PEOPLE BTN */}
           <button
             onClick={openAddPeople}
-            className="text-cyan-400 hover:text-cyan-300 transition-colors"
+            className="min-w-10 min-h-10 flex items-center justify-center text-cyan-400 hover:text-cyan-300 transition-colors"
             title="Add someone"
           >
             <UserPlusIcon className="size-5" />
           </button>
 
           {/* SETTINGS BTN */}
-          <Link to="/settings" className="text-slate-400 hover:text-slate-200 transition-colors">
+          <Link to="/settings" className="min-w-10 min-h-10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors" aria-label="Settings">
             <SettingsIcon className="size-5" />
           </Link>
 
           {/* SOUND TOGGLE BTN */}
           <button
-            className="text-slate-400 hover:text-slate-200 transition-colors"
+            className="min-w-10 min-h-10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
             title={isSoundEnabled ? "Sound on" : "Sound off"}
             aria-label={isSoundEnabled ? "Sound on" : "Sound off"}
             onClick={() => {

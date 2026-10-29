@@ -260,7 +260,7 @@ function ChatContainer() {
                     }}
                     onTouchEnd={() => clearTimeout(longPressRef.current.timer)}
                     onTouchMove={() => clearTimeout(longPressRef.current.timer)}
-                    className={`chat-bubble relative group max-w-[82%] sm:max-w-[75%] ${
+                    className={`chat-bubble relative group max-w-[85%] md:max-w-[70%] ${
                       hasPhotoVideo
                         ? `${isMine ? "bg-cyan-500 text-white" : "bg-slate-800 text-slate-200"} p-1`
                         : isMediaOnly
@@ -502,12 +502,12 @@ function ChatContainer() {
 
       {fullMedia && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
           onClick={() => setFullMedia(null)}
         >
           <button
             onClick={() => setFullMedia(null)}
-            className="absolute top-4 right-4 text-white/80 hover:text-white z-10"
+            className="absolute top-[calc(env(safe-area-inset-top)+0.5rem)] right-3 min-w-10 min-h-10 grid place-items-center text-white/80 hover:text-white z-10"
             aria-label="Close"
           >
             <XIcon className="w-7 h-7" />
@@ -518,14 +518,14 @@ function ChatContainer() {
               e.stopPropagation();
               downloadMedia();
             }}
-            className="absolute top-4 right-16 z-10 flex items-center gap-2 rounded-lg bg-slate-800/90 px-3 py-2 text-sm text-white"
+            className="absolute top-[calc(env(safe-area-inset-top)+0.5rem)] right-14 z-10 flex min-h-10 items-center gap-2 rounded-lg bg-slate-800/90 px-3 py-2 text-sm text-white"
           >
             <DownloadIcon className="h-4 w-4" /> Download
           </button>
           {fullMedia.type === "video" ? (
             <video 
               src={fullMedia.url}
-              className="max-h-[85vh] max-w-full rounded-lg object-contain"
+              className="max-h-[85dvh] max-w-full rounded-lg object-contain"
               controls
               autoPlay
               playsInline
@@ -537,7 +537,7 @@ function ChatContainer() {
             <img 
               src={fullMedia.url}
               alt="Shared"
-              className="max-h-[85vh] max-w-full rounded-lg object-contain"
+              className="max-h-[85dvh] max-w-full rounded-lg object-contain"
               onClick={(e) => e.stopPropagation()}
             />
           )}

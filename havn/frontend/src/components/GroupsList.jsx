@@ -87,13 +87,13 @@ function GroupsList() {
           <div
             key={group._id}
             onClick={() => setSelectedGroup(group)}
-            className={`p-4 rounded-lg cursor-pointer transition-colors ${
+            className={`chat-list-row min-w-0 p-3 sm:p-4 rounded-lg cursor-pointer transition-colors ${
               selectedGroup?._id === group._id
                 ? "bg-cyan-500/25 ring-1 ring-cyan-500/40"
                 : "bg-cyan-500/10 hover:bg-cyan-500/20"
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <div className="size-12 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden shrink-0">
                 {group.avatar ? (
                   <img  src={group.avatar} alt={group.name} className="size-full object-cover" />

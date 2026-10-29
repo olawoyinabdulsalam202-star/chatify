@@ -193,7 +193,7 @@ function LandingPage() {
             <span className="size-1.5 rounded-full bg-[#C2410C]" />
             Private messaging
           </span>
-          <h1 className="mt-6 font-display text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
+          <h1 className="marketing-heading mt-6 font-display font-bold tracking-tight">
             A <span className="text-[#C2410C]">calmer</span> place to talk.
           </h1>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-[#57534E]">
