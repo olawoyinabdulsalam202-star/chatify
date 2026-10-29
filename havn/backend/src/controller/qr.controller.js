@@ -36,14 +36,24 @@ export async function getQrInfo(req, res) {
 }
 
 export async function approveQrLogin(req, res) {
-  const record = await QrLogin.findOneAndUpdate(
-    { code: req.body?.code, status: "pending", expiresAt: { $gt: new Date() } },
-    { $set: { status: "approved", approvedBy: req.user._id } },
-    { new: true }
-  ).select("+code webDevice");
-  if (!record) return res.status(404).json({ message: "This QR code has expired or was already used." });
-  io.to(`qr:${record.code}`).emit("qrLoginApproved", { code: record.code });
-  res.status(200).json({ webDevice: record.webDevice });
+  const { code } = req.body || {};
+  if (typeof code !== "string" || code.length > 128) {
+    return res.status(400).json({ message: "Invalid QR code." });
+  }
+
+  try {
+    const record = await QrLogin.findOneAndUpdate(
+      { code, status: "pending", expiresAt: { $gt: new Date() } },
+      { $set: { status: "approved", approvedBy: req.user._id } },
+      { new: true }
+    ).select("+code webDevice");
+    if (!record) return res.status(404).json({ message: "This QR code has expired or was already used." });
+    io.to(`qr:${record.code}`).emit("qrLoginApproved", { code: record.code });
+    res.status(200).json({ webDevice: record.webDevice });
+  } catch (error) {
+    console.error("QR login approval failed:", error);
+    res.status(500).json({ message: "Could not approve QR login." });
+  }
 }
 
 export async function pollQrLogin(req, res) {

@@ -34,7 +34,12 @@ router.post("/reset-password", resetPassword);
 router.post("/qr/start", rateLimit({ key: (req) => req.ip, limit: 10, windowMs: 60_000 }), startQrLogin);
 router.get("/qr/:code/info", rateLimit({ key: (req) => req.ip, limit: 60, windowMs: 60_000 }), getQrInfo);
 router.get("/qr/:code/status", rateLimit({ key: (req) => req.ip, limit: 60, windowMs: 60_000 }), pollQrLogin);
-router.post("/qr/approve", protectRoute, approveQrLogin);
+router.post(
+  "/qr/approve",
+  protectRoute,
+  rateLimit({ key: (req) => String(req.user._id), limit: 20, windowMs: 60_000 }),
+  approveQrLogin
+);
 router.get("/sessions", protectRoute, listSessions);
 router.delete("/sessions/:id", protectRoute, revokeSession);
 router.post("/logout-all", protectRoute, logoutAll);
