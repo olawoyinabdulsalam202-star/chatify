@@ -95,7 +95,7 @@ function GroupInfoModal({ onClose }) {
   return (
     <div className="responsive-modal-backdrop fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-lg w-full max-w-md max-h-[100dvh] flex flex-col overflow-hidden"
+        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-lg w-full max-w-md max-h-[100dvh] md:max-h-[80vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 p-4 border-b border-slate-700/50">
@@ -103,7 +103,7 @@ function GroupInfoModal({ onClose }) {
             <span className="truncate">{group.name}</span>
             {group.creatorIsBadged && <VerifiedBadge className="w-4 h-4 shrink-0" />}
           </h3>
-          <button onClick={onClose} className="min-w-10 min-h-10 grid place-items-center text-slate-400 hover:text-slate-200 shrink-0" aria-label="Close">
+          <button onClick={onClose} className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 grid place-items-center text-slate-400 hover:text-slate-200 shrink-0" aria-label="Close">
             <XIcon className="w-5 h-5" />
           </button>
         </div>
@@ -139,7 +139,7 @@ function GroupInfoModal({ onClose }) {
             {isAdmin && (
               <button
                 onClick={() => setShowAddMembers((v) => !v)}
-                className="min-h-10 text-cyan-400 hover:text-cyan-300 text-xs flex items-center gap-1"
+                className="min-h-10 md:min-h-0 text-cyan-400 hover:text-cyan-300 text-xs flex items-center gap-1"
               >
                 <PlusIcon className="w-3.5 h-3.5" /> Invite
               </button>
@@ -190,7 +190,7 @@ function GroupInfoModal({ onClose }) {
                   </span>
                   <button
                     onClick={() => cancelGroupInvite(group._id, invite.inviteId)}
-                    className="min-h-10 px-2 text-slate-500 hover:text-red-400 text-[10px] uppercase shrink-0"
+                    className="min-h-10 md:min-h-0 md:px-0 text-slate-500 hover:text-red-400 text-[10px] uppercase shrink-0"
                   >
                     Cancel
                   </button>
@@ -234,14 +234,14 @@ function GroupInfoModal({ onClose }) {
                     <button
                       title={m.role === "admin" ? "Demote" : "Make admin"}
                       onClick={() => setMemberRole(group._id, user._id, m.role === "admin" ? "member" : "admin")}
-                      className="min-w-10 min-h-10 grid place-items-center text-slate-400 hover:text-cyan-400"
+                      className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 grid place-items-center text-slate-400 hover:text-cyan-400"
                     >
                       <ShieldIcon className="w-4 h-4" />
                     </button>
                     <button
                       title="Remove"
                       onClick={() => removeMember(group._id, user._id)}
-                      className="min-w-10 min-h-10 grid place-items-center text-slate-400 hover:text-red-400"
+                      className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 grid place-items-center text-slate-400 hover:text-red-400"
                     >
                       <UserMinusIcon className="w-4 h-4" />
                     </button>

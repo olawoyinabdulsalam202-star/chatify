@@ -3,6 +3,8 @@ import { useGroupStore } from "../store/useGroupStore";
 import { HashIcon, MegaphoneIcon, PlusIcon, CheckIcon, XIcon } from "lucide-react";
 import VerifiedBadge from "./VerifiedBadge";
 import CreateGroupModal from "./CreateGroupModal";
+import { useAuthStore } from "../store/useAuthStore";
+import { getFontStack } from "../lib/fonts";
 
 function GroupsList() {
   const {
@@ -15,6 +17,7 @@ function GroupsList() {
     respondToGroupInvite,
   } = useGroupStore();
   const [showCreate, setShowCreate] = useState(false);
+  const authUser = useAuthStore((state) => state.authUser);
 
   useEffect(() => {
     getMyGroups();
@@ -104,7 +107,7 @@ function GroupsList() {
                 )}
               </div>
               <div className="min-w-0">
-                <h4 className="text-slate-200 font-medium truncate flex items-center gap-1">
+                <h4 style={{ fontFamily: getFontStack(authUser?.settings?.fontFamily) }} className="text-slate-200 font-medium truncate flex items-center gap-1">
                   {group.name}
                   {group.creatorIsBadged && <VerifiedBadge className="w-3.5 h-3.5" />}
                 </h4>

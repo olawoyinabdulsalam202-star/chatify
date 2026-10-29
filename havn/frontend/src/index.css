@@ -262,10 +262,6 @@ body,
   overflow-x: clip;
 }
 
-body {
-  overflow-wrap: anywhere;
-}
-
 pre,
 table {
   max-width: 100%;
@@ -308,19 +304,6 @@ pre,
   text-shadow: 0 1px 5px rgb(255 255 255 / 25%);
 }
 
-.responsive-modal-backdrop {
-  padding-top: max(0.5rem, env(safe-area-inset-top));
-  padding-right: max(0.5rem, env(safe-area-inset-right));
-  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
-  padding-left: max(0.5rem, env(safe-area-inset-left));
-}
-
-.responsive-modal-panel {
-  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 1rem);
-  min-width: 0;
-  max-width: 100%;
-}
-
 .profile-header,
 .chat-header,
 .group-chat-header,
@@ -332,7 +315,12 @@ pre,
 
 .auth-heading {
   font-size: clamp(1.5rem, 4vw, 1.875rem);
-  line-height: 1.15;
+  line-height: 1.2;
+}
+
+.settings-heading {
+  font-size: clamp(1.375rem, 4vw, 1.5rem);
+  line-height: 1.2;
 }
 
 .marketing-heading {
@@ -340,7 +328,7 @@ pre,
   line-height: 1.05;
 }
 
-@media (max-width: 639px) {
+@media (max-width: 767px) {
   .responsive-modal-backdrop {
     padding: 0;
   }
@@ -352,6 +340,8 @@ pre,
     border-radius: 0;
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
+    min-width: 0;
+    max-width: 100%;
     overflow-y: auto;
   }
 
@@ -405,6 +395,12 @@ pre,
   .story-avatar {
     width: 2.5rem;
     height: 2.5rem;
+  }
+}
+
+@media (max-width: 339px) {
+  .profile-add-friend {
+    display: none;
   }
 }
 

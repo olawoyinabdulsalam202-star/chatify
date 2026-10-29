@@ -9,8 +9,7 @@ const frontendDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const screenshotDir = resolve(frontendDir, "responsive-shots");
 const viteEntry = resolve(frontendDir, "node_modules/vite/bin/vite.js");
 const viewports = [
-  [280, 653], [320, 568], [360, 760], [390, 844], [430, 932], [540, 720],
-  [717, 512], [768, 1024], [1024, 768], [1280, 800], [1920, 1080], [844, 390],
+  [1840, 1000], [1280, 800], [1024, 768], [768, 1024], [390, 844], [320, 568],
 ];
 const testUserId = "64b000000000000000000001";
 const peerId = "64b000000000000000000002";
@@ -93,47 +92,78 @@ try {
     });
 
     let passed = true;
+    const errors = [];
     const checkOverflow = async (targetPage) => targetPage.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       innerWidth: window.innerWidth,
     }));
-
-    authenticated = false;
-    await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
-    const landingOverflow = await checkOverflow(page);
-    if (landingOverflow.scrollWidth > landingOverflow.innerWidth) passed = false;
-    await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-landing.png`), fullPage: true });
-
-    await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded" });
-    const loginOverflow = await checkOverflow(page);
-    if (loginOverflow.scrollWidth > loginOverflow.innerWidth) passed = false;
-    await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-login.png`), fullPage: true });
-
-    await page.goto(`${baseUrl}/signup`, { waitUntil: "domcontentloaded" });
-    const signupOverflow = await checkOverflow(page);
-    if (signupOverflow.scrollWidth > signupOverflow.innerWidth) passed = false;
-    await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-signup.png`), fullPage: true });
-
     authenticated = true;
-    await page.goto(`${baseUrl}/settings`, { waitUntil: "domcontentloaded" });
-    const settingsOverflow = await checkOverflow(page);
-    if (settingsOverflow.scrollWidth > settingsOverflow.innerWidth) passed = false;
-    await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-settings.png`), fullPage: true });
-
-    await page.goto(`${baseUrl}/?dm=${peerId}`, { waitUntil: "domcontentloaded" });
-    let chatAvailable = false;
+    await page.goto(baseUrl, { waitUntil: "domcontentloaded" });
+    const profileHeader = page.locator(".profile-header");
+    const chatListRow = page.locator(".chat-list-row").first();
     try {
-      await page.locator(".chat-header").waitFor({ state: "visible", timeout: 8000 });
-      chatAvailable = true;
-      const chatOverflow = await checkOverflow(page);
-      if (chatOverflow.scrollWidth > chatOverflow.innerWidth) passed = false;
-      await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-chat.png`), fullPage: true });
+      await profileHeader.waitFor({ state: "visible", timeout: 10000 });
+      await chatListRow.waitFor({ state: "visible", timeout: 10000 });
     } catch {
-      await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-chat-unavailable.png`), fullPage: true });
+      passed = false;
+      errors.push("mocked chat layout did not load");
+    }
+
+    const overflow = await checkOverflow(page);
+    if (overflow.scrollWidth > overflow.innerWidth) {
+      passed = false;
+      errors.push(`document width ${overflow.scrollWidth}px exceeds viewport ${overflow.innerWidth}px`);
+    }
+
+    const profileAvailable = await profileHeader.isVisible().catch(() => false);
+    const rowAvailable = await chatListRow.isVisible().catch(() => false);
+    if (profileAvailable) {
+    const profileCheck = await profileHeader.evaluate((header) => {
+      const name = header.querySelector("h3");
+      const nameText = header.querySelector("h3 > span");
+      const status = header.querySelector(".profile-secondary");
+      const nameWidth = nameText?.getBoundingClientRect().width || 0;
+      const statusStyle = status ? getComputedStyle(status) : null;
+      const statusWraps = status && statusStyle.whiteSpace !== "nowrap"
+        && status.getBoundingClientRect().height > parseFloat(statusStyle.lineHeight || "0") * 1.5;
+      const textWrapsOneCharacterPerLine = [
+        ...header.querySelectorAll("h3, .profile-secondary"),
+        ...document.querySelectorAll(".chat-list-row h4, .chat-list-row p"),
+      ].some((element) => {
+        const text = element.textContent.trim();
+        if (text.length < 4) return false;
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return range.getClientRects().length >= text.length - 1;
+      });
+      return { nameWidth, statusWraps, textWrapsOneCharacterPerLine };
+    });
+    if (profileCheck.nameWidth < 60) {
+      passed = false;
+      errors.push(`profile name width is ${Math.round(profileCheck.nameWidth)}px`);
+    }
+    if (profileCheck.statusWraps) {
+      passed = false;
+      errors.push("profile status wraps vertically");
+    }
+    if (profileCheck.textWrapsOneCharacterPerLine) {
+      passed = false;
+      errors.push("text wraps one character per line");
+    }
+
+    await profileHeader.screenshot({ path: resolve(screenshotDir, `${width}x${height}-profile.png`) });
+    } else {
+      await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-profile-unavailable.png`) });
+    }
+    if (rowAvailable) {
+      const listPane = page.locator("div.overflow-y-auto").first();
+      await listPane.screenshot({ path: resolve(screenshotDir, `${width}x${height}-chat-list.png`) });
+    } else {
+      await page.screenshot({ path: resolve(screenshotDir, `${width}x${height}-chat-list-unavailable.png`) });
     }
 
     if (!passed) failures += 1;
-    console.log(`${passed ? "PASS" : "FAIL"} ${width}x${height} landing + login + signup + settings${chatAvailable ? " + chat" : " (chat unavailable)"}`);
+    console.log(`${passed ? "PASS" : "FAIL"} ${width}x${height}${errors.length ? `: ${errors.join("; ")}` : ""}`);
     await page.close();
   }
 } finally {

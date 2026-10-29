@@ -78,7 +78,7 @@ function LoginPage() {
         <div className="hidden md:flex md:w-1/2 bg-cyan-500 text-white p-10 flex-col justify-between">
           <Logo tone="invert" size={40} />
           <div>
-            <h1 className="marketing-heading font-bold leading-tight mb-4">A calmer place to talk.</h1>
+            <h1 className="marketing-heading font-bold leading-tight mb-4 md:!text-4xl md:!leading-tight">A calmer place to talk.</h1>
             <p className="text-white/85 text-lg max-w-sm">
               Messages, voice notes, photos, and calls — private by default, without the noise.
             </p>

@@ -42,7 +42,7 @@ function StoryTray() {
               e.stopPropagation();
               setShowCreate(true);
             }}
-            className="absolute -bottom-2 -right-2 size-10 rounded-full bg-cyan-500 flex items-center justify-center border-2 border-slate-800"
+            className="absolute -bottom-0.5 -right-0.5 size-5 rounded-full bg-cyan-500 flex items-center justify-center border-2 border-slate-800"
           >
             <PlusIcon className="w-3 h-3 text-white" />
           </button>

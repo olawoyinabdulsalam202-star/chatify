@@ -9,14 +9,14 @@ function ActiveTabSwitch() {
     <div className="tab-switcher tabs tabs-boxed bg-transparent p-1.5 sm:p-2 m-1.5 sm:m-2">
       <button
         onClick={() => setActiveTab("chats")}
-        className={`tab min-h-10 flex-1 transition-colors ${activeTab === "chats" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400"}`}
+        className={`tab min-h-10 flex-1 md:min-h-0 md:flex-none transition-colors ${activeTab === "chats" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400"}`}
       >
         Chats
       </button>
 
       <button
         onClick={() => setActiveTab("groups")}
-        className={`tab min-h-10 flex-1 relative transition-colors ${activeTab === "groups" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400"}`}
+        className={`tab min-h-10 flex-1 md:min-h-0 md:flex-none relative transition-colors ${activeTab === "groups" ? "bg-cyan-500/20 text-cyan-400" : "text-slate-400"}`}
       >
         Groups
         {receivedGroupInvites.length > 0 && (

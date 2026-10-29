@@ -20,7 +20,7 @@ function SignUpPage() {
         <div className="hidden md:flex md:w-1/2 bg-cyan-500 text-white p-10 flex-col justify-between order-first">
           <Logo tone="invert" size={40} />
           <div>
-            <h1 className="marketing-heading font-bold leading-tight mb-4">Find your quiet corner.</h1>
+            <h1 className="marketing-heading font-bold leading-tight mb-4 md:!text-4xl md:!leading-tight">Find your quiet corner.</h1>
             <p className="text-white/85 text-lg max-w-sm">
               Set up in seconds. No phone number, no ads, no algorithm deciding what you see.
             </p>

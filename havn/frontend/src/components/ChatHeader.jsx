@@ -49,7 +49,7 @@ function ChatHeader() {
   }, [menuOpen]);
 
   return (
-    <div className="chat-header relative flex shrink-0 justify-between items-center gap-2 bg-slate-800/50 border-b border-slate-700/50 min-h-[64px] px-1.5 sm:px-6 py-1">
+    <div className="chat-header relative flex shrink-0 justify-between items-center gap-2 bg-slate-800/50 border-b border-slate-700/50 min-h-[64px] md:min-h-[72px] md:max-h-[84px] px-1.5 sm:px-6 py-1 md:py-0">
       <div className="flex items-center space-x-3 min-w-0 flex-1">
         {/* Back arrow on mobile only */}
         <button className="md:hidden mr-1 shrink-0 min-w-10 min-h-10 grid place-items-center" onClick={() => setSelectedUser(null)} aria-label="Back to chats">
@@ -79,7 +79,7 @@ function ChatHeader() {
       <div className="relative shrink-0" ref={menuRef}>
         <button
           onClick={() => setMenuOpen((v) => !v)}
-          className={`min-w-10 min-h-10 grid place-items-center text-slate-400 hover:text-slate-200 transition-colors ${menuOpen ? "text-slate-200" : ""}`}
+          className={`min-w-10 min-h-10 md:min-w-0 md:min-h-0 grid place-items-center text-slate-400 hover:text-slate-200 transition-colors ${menuOpen ? "text-slate-200" : ""}`}
           aria-label="More options"
         >
           <MoreVerticalIcon className="w-5 h-5" />

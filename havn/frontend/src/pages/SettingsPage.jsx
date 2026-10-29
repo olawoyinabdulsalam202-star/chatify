@@ -646,7 +646,7 @@ function SettingsPage() {
             >
               <ArrowLeftIcon className="w-5 h-5" /> Settings
             </button>
-            <h1 className="auth-heading font-semibold mb-6">{activeSection.title}</h1>
+            <h1 className="settings-heading font-semibold mb-6">{activeSection.title}</h1>
             {renderSection()}
           </>
         ) : (
@@ -657,7 +657,7 @@ function SettingsPage() {
             >
               <ArrowLeftIcon className="w-5 h-5" /> Back
             </button>
-            <h1 className="auth-heading font-semibold mb-6">Settings</h1>
+            <h1 className="settings-heading font-semibold mb-6">Settings</h1>
 
             <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 overflow-hidden divide-y divide-slate-700/50">
               {SECTIONS.map(({ key, title, description, Icon }) => (

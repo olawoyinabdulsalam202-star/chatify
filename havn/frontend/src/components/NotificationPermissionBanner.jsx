@@ -51,11 +51,11 @@ function NotificationPermissionBanner({ userId }) {
         type="button"
         onClick={enable}
         disabled={busy}
-        className="min-h-10 shrink-0 rounded-lg bg-cyan-500 px-3 text-xs font-medium text-white disabled:opacity-50"
+        className="min-h-10 md:min-h-0 shrink-0 rounded-lg bg-cyan-500 px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
       >
         {busy ? "Enabling…" : "Turn on"}
       </button>
-      <button type="button" onClick={dismiss} className="min-w-10 min-h-10 shrink-0 grid place-items-center text-slate-400" aria-label="Dismiss">
+      <button type="button" onClick={dismiss} className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 shrink-0 grid place-items-center text-slate-400" aria-label="Dismiss">
         <XIcon className="h-4 w-4" />
       </button>
     </div>

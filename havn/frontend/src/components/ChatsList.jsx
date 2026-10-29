@@ -5,10 +5,11 @@ import NoChatsFound from "./NoChatsFound";
 import { useAuthStore } from "../store/useAuthStore";
 import VerifiedBadge from "./VerifiedBadge";
 import { presenceLabel } from "../lib/lastSeen";
+import { getFontStack } from "../lib/fonts";
 
 function ChatsList() {
   const { getMyChatPartners, chats, isUsersLoading, setSelectedUser, selectedUser, unreadCounts } = useChatStore();
-  const { onlineUsers } = useAuthStore();
+  const { onlineUsers, authUser } = useAuthStore();
 
   useEffect(() => {
     getMyChatPartners();
@@ -38,7 +39,7 @@ function ChatsList() {
                 </div>
               </div>
               <div className="flex-1 min-w-0">
-                <h4 className="text-slate-200 font-medium truncate flex items-center gap-1">
+                <h4 style={{ fontFamily: getFontStack(authUser?.settings?.fontFamily) }} className="text-slate-200 font-medium truncate flex items-center gap-1">
                   <span className="truncate">{chat.fullName}</span>
                   {chat.isBadged && <VerifiedBadge className="w-3.5 h-3.5 shrink-0" />}
                 </h4>

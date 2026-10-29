@@ -74,14 +74,14 @@ function AddPeopleModal() {
       onClick={closeAddPeople}
     >
       <div
-        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[100dvh] flex flex-col overflow-hidden"
+        className="responsive-modal-panel bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md max-h-[100dvh] md:max-h-[70vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-2 p-3 sm:p-4 border-b border-slate-700">
           <h3 className="text-slate-100 font-semibold">Add someone</h3>
           <button
             onClick={closeAddPeople}
-            className="min-w-10 min-h-10 grid place-items-center text-slate-500 hover:text-slate-300 transition-colors"
+            className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 grid place-items-center text-slate-500 hover:text-slate-300 transition-colors"
           >
             <XIcon className="w-5 h-5" />
           </button>
@@ -136,7 +136,7 @@ function AddPeopleModal() {
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => openChatWith({ ...u, isFriend: u.isFriend })}
-                      className="min-h-10 flex items-center gap-1 px-2.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-medium transition-colors"
+                      className="min-h-10 md:min-h-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-medium transition-colors"
                     >
                       <MessageCircleIcon className="w-3.5 h-3.5" /> Message
                     </button>
@@ -144,7 +144,7 @@ function AddPeopleModal() {
                       <button
                         onClick={() => handleAdd(u)}
                         disabled={addingId === u._id}
-                        className="min-h-10 flex items-center gap-1 px-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                        className="min-h-10 md:min-h-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-600 text-white text-xs font-medium transition-colors disabled:opacity-50"
                       >
                         {addingId === u._id ? <LoaderIcon className="w-3.5 h-3.5 animate-spin" /> : <UserPlusIcon className="w-3.5 h-3.5" />}
                         Add

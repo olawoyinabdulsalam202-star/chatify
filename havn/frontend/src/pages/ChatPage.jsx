@@ -176,7 +176,7 @@ function ChatPage() {
   // mobile means the viewport with the URL bar hidden, which pushes the message
   // input off-screen until you scroll.
   return (
-    <div className="relative w-full max-w-6xl min-h-0 h-full max-h-[920px]">
+    <div className="relative w-full max-w-6xl md:max-w-none min-h-0 h-full max-h-[920px]">
       <Panel
         className="md:grid md:grid-cols-[var(--sidebar-w)_6px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]"
         style={{ "--sidebar-w": `${sidebarWidth}px` }}
@@ -203,7 +203,7 @@ function ChatPage() {
           role="separator"
           aria-orientation="vertical"
           aria-valuenow={sidebarWidth}
-          aria-valuemin={280}
+          aria-valuemin={320}
           aria-valuemax={sidebarMaxWidth}
           aria-label="Resize chat list"
           tabIndex={0}

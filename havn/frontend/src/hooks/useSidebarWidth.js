@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const STORAGE_KEY = "havn.sidebarWidth";
-const DEFAULT_WIDTH = 380;
-const MIN_WIDTH = 280;
-const MAX_WIDTH = 520;
+const DEFAULT_RATIO = 0.38;
+const MIN_WIDTH = 320;
+
+function getDefaultWidth() {
+  return Math.max(MIN_WIDTH, Math.round(window.innerWidth * DEFAULT_RATIO));
+}
 
 function getMaxWidth() {
-  if (window.innerWidth < 768) return MAX_WIDTH;
-  return Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Math.floor(window.innerWidth * 0.45)));
+  return Math.max(MIN_WIDTH, Math.floor(window.innerWidth * 0.45));
 }
 
 function clampWidth(value) {
@@ -19,9 +21,8 @@ function getInitialWidth() {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     const value = stored === null || stored.trim() === "" ? NaN : Number(stored);
-    const width = Number.isFinite(value) && value >= MIN_WIDTH && value <= MAX_WIDTH
-      ? clampWidth(value)
-      : clampWidth(DEFAULT_WIDTH);
+    const hasSavedCustomWidth = Number.isFinite(value) && value >= MIN_WIDTH && value !== 380;
+    const width = hasSavedCustomWidth ? clampWidth(value) : clampWidth(getDefaultWidth());
     window.localStorage.setItem(STORAGE_KEY, String(width));
     return width;
   } catch {

@@ -5,6 +5,7 @@ import { useChatStore } from "../store/useChatStore";
 import { Link } from "react-router";
 import VerifiedBadge from "./VerifiedBadge";
 import toast from "react-hot-toast";
+import { getFontStack } from "../lib/fonts";
 
 const mouseClickSound = new Audio("/sounds/mouse-click.mp3");
 
@@ -59,13 +60,13 @@ function ProfileHeader() {
           </div>
 
           {/* USERNAME & ONLINE TEXT */}
-          <div className="min-w-0">
-            <h3 className="text-slate-200 font-medium text-base truncate flex items-center gap-1">
+          <div className="profile-user-info min-w-0 flex-1">
+            <h3 style={{ fontFamily: getFontStack(authUser.settings?.fontFamily) }} className="text-slate-200 font-medium text-base truncate flex items-center gap-1">
               <span className="min-w-0 truncate">{authUser.fullName}</span>
               {authUser.isBadged && <VerifiedBadge className="w-4 h-4 shrink-0" />}
             </h3>
 
-            <p className="profile-secondary text-slate-400 text-xs">Online</p>
+            <p className="profile-secondary whitespace-nowrap text-slate-400 text-xs">Online</p>
           </div>
         </div>
 
@@ -74,20 +75,20 @@ function ProfileHeader() {
           {/* ADD PEOPLE BTN */}
           <button
             onClick={openAddPeople}
-            className="min-w-10 min-h-10 flex items-center justify-center text-cyan-400 hover:text-cyan-300 transition-colors"
+            className="profile-add-friend min-w-10 min-h-10 md:min-w-0 md:min-h-0 flex items-center justify-center text-cyan-400 hover:text-cyan-300 transition-colors"
             title="Add someone"
           >
             <UserPlusIcon className="size-5" />
           </button>
 
           {/* SETTINGS BTN */}
-          <Link to="/settings" className="min-w-10 min-h-10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors" aria-label="Settings">
+          <Link to="/settings" className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors" aria-label="Settings">
             <SettingsIcon className="size-5" />
           </Link>
 
           {/* SOUND TOGGLE BTN */}
           <button
-            className="min-w-10 min-h-10 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
+            className="min-w-10 min-h-10 md:min-w-0 md:min-h-0 flex items-center justify-center text-slate-400 hover:text-slate-200 transition-colors"
             title={isSoundEnabled ? "Sound on" : "Sound off"}
             aria-label={isSoundEnabled ? "Sound on" : "Sound off"}
             onClick={() => {
