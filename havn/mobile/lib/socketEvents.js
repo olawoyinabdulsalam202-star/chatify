@@ -2,6 +2,8 @@ import { useAuthStore } from "../stores/useAuthStore";
 import { useChatStore } from "../stores/useChatStore";
 import { useMessageStore } from "../stores/useMessageStore";
 import { usePresenceStore } from "../stores/usePresenceStore";
+import { useGroupStore } from "../stores/useGroupStore";
+import { useStoryStore } from "../stores/useStoryStore";
 
 const boundSockets = new WeakSet();
 
@@ -14,6 +16,16 @@ export function bindSocketEvents(socket) {
     useChatStore.getState().loadChats({ quiet: true });
   });
   socket.on("getOnlineUsers", (ids) => usePresenceStore.getState().setOnlineUsers(ids));
+  socket.on("newGroupMessage", (message) => useGroupStore.getState().receive(message));
+  socket.on("messageEdited", (message) => { if (message.groupId) useGroupStore.getState().editMessage(message); });
+  socket.on("messageDeleted", (message) => { if (message.groupId) useGroupStore.getState().editMessage(message); });
+  socket.on("groupUpdated", (group) => useGroupStore.setState((state) => ({ groups: state.groups.map((item) => String(item._id) === String(group._id) ? group : item) })));
+  socket.on("groupCreated", (group) => useGroupStore.setState((state) => ({ groups: state.groups.some((item) => String(item._id) === String(group._id)) ? state.groups : [group, ...state.groups] })));
+  socket.on("groupDeleted", ({ groupId }) => useGroupStore.setState((state) => ({ groups: state.groups.filter((item) => String(item._id) !== String(groupId)) })));
+  socket.on("newStory", () => useStoryStore.getState().load());
+  socket.on("storyDeleted", ({ storyId }) => useStoryStore.setState((state) => ({ mine: state.mine.filter((item) => String(item._id) !== String(storyId)), feed: state.feed.map((group) => ({ ...group, stories: group.stories.filter((item) => String(item._id) !== String(storyId)) })).filter((group) => group.stories.length) })));
+  socket.on("storyViewed", ({ storyId, viewerId }) => useStoryStore.setState((state) => ({ mine: state.mine.map((story) => String(story._id) !== String(storyId) || story.viewers?.some((item) => String(item.userId?._id || item.userId) === String(viewerId)) ? story : { ...story, viewers: [...(story.viewers || []), { userId: viewerId, viewedAt: new Date().toISOString() }] }) })));
+  socket.on("storyLiked", ({ storyId, likerId }) => useStoryStore.setState((state) => ({ mine: state.mine.map((story) => String(story._id) !== String(storyId) || story.likes?.some((item) => String(item.userId?._id || item.userId) === String(likerId)) ? story : { ...story, likes: [...(story.likes || []), { userId: likerId, likedAt: new Date().toISOString() }] }) })));
   socket.on("presenceUpdate", ({ userId, online }) => usePresenceStore.getState().setPresence(userId, online));
   socket.on("newMessage", (message) => {
     if (!message?.receiverId) return;

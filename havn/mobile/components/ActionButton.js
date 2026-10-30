@@ -9,7 +9,7 @@ export default function ActionButton({ title, onPress, busy = false, disabled = 
       { backgroundColor: secondary ? theme.surface : theme.primary, borderColor: secondary ? theme.border : theme.primary, opacity: pressed ? 0.82 : disabled || busy ? 0.58 : 1 },
       style,
     ]}>
-      {busy ? <ActivityIndicator color={secondary ? theme.primary : theme.white} /> : <Text allowFontScaling style={[styles.label, { color: secondary ? theme.text : theme.white }]}>{title}</Text>}
+      {busy ? <ActivityIndicator color={secondary ? theme.primary : theme.white} /> : <Text allowFontScaling style={[styles.label, { color: secondary ? theme.text : theme.white, fontFamily: theme.fontFamily, fontSize: 16 * theme.fontScale }]}>{title}</Text>}
     </Pressable>
   );
 }

@@ -2,6 +2,9 @@ import { create } from "zustand";
 import { api } from "../lib/api";
 import { getSocket } from "../lib/socket";
 
+const markSeenTimers = new Map();
+const markSeenRequests = new Map();
+
 const mergeById = (current, fresh) => {
   const map = new Map(current.map((item) => [String(item._id), item]));
   fresh.forEach((item) => map.set(String(item._id), { ...map.get(String(item._id)), ...item }));
@@ -24,7 +27,15 @@ export const useMessageStore = create((set, get) => ({
     else await get().loadMessages(partner._id, { quiet: true });
     get().markSeen(partner._id);
   },
-  closeChat: () => set({ openPartner: null, isTyping: false, replyTarget: null }),
+  closeChat: () => {
+    const partnerId = get().openPartner?._id;
+    if (!partnerId) return;
+    const key = String(partnerId);
+    const timer = markSeenTimers.get(key);
+    if (timer) clearTimeout(timer);
+    markSeenTimers.delete(key);
+    set({ openPartner: null, isTyping: false, replyTarget: null });
+  },
   loadMessages: async (partnerId, { quiet = false } = {}) => {
     if (!quiet) set({ isLoading: true, error: "" });
     try {
@@ -42,11 +53,38 @@ export const useMessageStore = create((set, get) => ({
     if (partner?._id) return get().loadMessages(partner._id, { quiet: true });
   },
   loadOlder: () => set({ visibleCount: Math.min(get().messages.length, get().visibleCount + 30) }),
-  markSeen: async (partnerId) => {
-    try {
-      await api(`/messages/seen/${partnerId}`, { method: "PUT" });
-      set({ messages: get().messages.map((message) => String(message.senderId) === String(partnerId) ? { ...message, status: "seen" } : message) });
-    } catch {}
+  markSeen: (partnerId) => {
+    const key = String(partnerId);
+    const hasUnread = () => get().messages.some((message) =>
+      String(message.senderId) === key && message.status !== "seen"
+    );
+    if (String(get().openPartner?._id) !== key || !hasUnread() || markSeenRequests.has(key)) return;
+
+    const previousTimer = markSeenTimers.get(key);
+    if (previousTimer) clearTimeout(previousTimer);
+    const timer = setTimeout(async () => {
+      markSeenTimers.delete(key);
+      if (String(get().openPartner?._id) !== key || !hasUnread()) return;
+
+      const pendingIds = new Set(get().messages
+        .filter((message) => String(message.senderId) === key && message.status !== "seen")
+        .map((message) => String(message._id)));
+      if (!pendingIds.size) return;
+
+      let marked = false;
+      const request = api(`/messages/seen/${key}`, { method: "PUT" });
+      markSeenRequests.set(key, request);
+      try {
+        await request;
+        marked = true;
+        set({ messages: get().messages.map((message) => pendingIds.has(String(message._id)) ? { ...message, status: "seen" } : message) });
+      } catch {
+      } finally {
+        markSeenRequests.delete(key);
+        if (marked && String(get().openPartner?._id) === key && hasUnread()) get().markSeen(key);
+      }
+    }, 120);
+    markSeenTimers.set(key, timer);
   },
   send: async (payload) => {
     const partner = get().openPartner;

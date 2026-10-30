@@ -22,6 +22,16 @@ const shapes = {
   bot: <><Rect x="4" y="7" width="16" height="13" rx="4" /><Path d="M12 3v4m-4 6h.01M16 13h.01M8 17h8" /></>,
   more: <><Circle cx="12" cy="5" r="1" /><Circle cx="12" cy="12" r="1" /><Circle cx="12" cy="19" r="1" /></>,
   trash: <><Path d="M3 6h18M8 6V4h8v2m3 0-.8 14H5.8L5 6m4 4v6m6-6v6" /></>,
+  users: <><Circle cx="9" cy="8" r="3" /><Path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5v1" /></>,
+  heart: <Path d="M20.8 8.8c0 5.1-8.8 11-8.8 11s-8.8-5.9-8.8-11A4.8 4.8 0 0 1 12 6.6a4.8 4.8 0 0 1 8.8 2.2Z" />,
+  message: <><Path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z" /></>,
+  info: <><Circle cx="12" cy="12" r="10" /><Path d="M12 11v5m0-8h.01" /></>,
+  user: <><Circle cx="12" cy="8" r="4" /><Path d="M5 21v-2a7 7 0 0 1 14 0v2" /></>,
+  lock: <><Rect x="4" y="10" width="16" height="11" rx="2" /><Path d="M8 10V7a4 4 0 0 1 8 0v3" /></>,
+  palette: <><Path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.3-3.5 1.8 1.8 0 0 1 1.2-3.1H18a3 3 0 0 0 3-3c0-4.6-4-8.4-9-8.4Z" /><Circle cx="7.5" cy="11" r="1" /><Circle cx="10" cy="7.5" r="1" /><Circle cx="15" cy="8" r="1" /></>,
+  help: <><Circle cx="12" cy="12" r="10" /><Path d="M9.6 9a2.5 2.5 0 1 1 4.8 1c-.8 1.2-2.4 1.5-2.4 3m0 3h.01" /></>,
+  logout: <><Path d="M10 17l5-5-5-5m5 5H3" /><Path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
+  phone: <><Rect x="6" y="2" width="12" height="20" rx="2" /><Path d="M11 18h2" /></>,
 };
 
 export default function Icon({ name, size = 22, color = "#3A332B", strokeWidth = 1.8 }) {

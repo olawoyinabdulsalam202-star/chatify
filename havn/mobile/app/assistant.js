@@ -160,7 +160,7 @@ export default function AssistantScreen() {
 
       <View style={[styles.composer, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
         <View style={[styles.inputWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <TextInput value={text} onChangeText={(value) => setText(value.slice(0, 2000))} editable={!sending} maxLength={2000} multiline placeholder="Message Havn AI" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.text }]} />
+          <TextInput allowFontScaling value={text} onChangeText={(value) => setText(value.slice(0, 2000))} editable={!sending} maxLength={2000} multiline placeholder="Message Havn AI" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.text, fontFamily: theme.fontFamily, fontSize: 16 * theme.fontScale, lineHeight: 21 * theme.fontScale }]} />
           <Text allowFontScaling style={[styles.counter, { color: text.length >= 1900 ? theme.danger : theme.muted }]}>{text.length}/2000</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={!text.trim() || sending} onPress={handleSend} style={[styles.send, { backgroundColor: theme.primary, opacity: !text.trim() || sending ? 0.5 : 1 }]}>
             <Icon name="send" color={theme.white} size={18} />

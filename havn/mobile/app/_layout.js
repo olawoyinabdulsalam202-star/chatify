@@ -11,6 +11,8 @@ import LoadingView from "../components/LoadingView";
 import UpdateRequired from "../components/UpdateRequired";
 import UpdateBanner from "../components/UpdateBanner";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { loadFont } from "../lib/fonts";
 
 function compareVersion(first, second) {
   const a = String(first || "0").split(".").map(Number);
@@ -50,6 +52,14 @@ function RootNavigation() {
   }, [hydrate, setAndroidRelease]);
 
   useEffect(() => {
+    const fontFamily = authUser?.settings?.fontFamily || "sans";
+    loadFont(fontFamily).then(() => {
+      const current = useAuthStore.getState().authUser;
+      if (current && (current.settings?.fontFamily || "sans") === fontFamily) useAuthStore.getState().updateUser({ settings: { ...current.settings } });
+    });
+  }, [authUser?.settings?.fontFamily]);
+
+  useEffect(() => {
     const publicPath = pathname.startsWith("/u/") || pathname.startsWith("/qr/");
     const authPath = ["/login", "/signup", "/verify"].includes(pathname);
     const redirect = typeof params.redirect === "string" && params.redirect.startsWith("/") && !params.redirect.startsWith("//")
@@ -70,8 +80,11 @@ function RootNavigation() {
       <Stack.Screen name="signup" />
       <Stack.Screen name="verify" />
       <Stack.Screen name="chat/[id]" />
+      <Stack.Screen name="group/[id]" />
       <Stack.Screen name="assistant" />
-      <Stack.Screen name="settings" />
+      <Stack.Screen name="settings/index" />
+      <Stack.Screen name="settings/[section]" />
+      <Stack.Screen name="settings/legal/[doc]" />
       <Stack.Screen name="link-device" />
       <Stack.Screen name="qr/[code]" />
       <Stack.Screen name="u/[username]" />
@@ -80,5 +93,5 @@ function RootNavigation() {
 }
 
 export default function RootLayout() {
-  return <SafeAreaProvider><RootNavigation /><StatusBar style="auto" /></SafeAreaProvider>;
+  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><RootNavigation /><StatusBar style="auto" /></SafeAreaProvider></GestureHandlerRootView>;
 }

@@ -1,5 +1,6 @@
 import { useColorScheme } from "react-native";
 import { useAuthStore } from "../stores/useAuthStore";
+import { getNativeFontFamily } from "./fonts";
 
 const palettes = {
   light: {
@@ -42,9 +43,18 @@ const palettes = {
 
 export function useTheme() {
   const systemScheme = useColorScheme();
-  const preference = useAuthStore((state) => state.authUser?.settings?.theme);
+  const settings = useAuthStore((state) => state.authUser?.settings);
+  const preference = settings?.theme;
   const mode = preference === "light" || preference === "dark" ? preference : systemScheme || "light";
-  return palettes[mode] || palettes.light;
+  const fontSize = settings?.fontSize;
+  const fontScale = fontSize === "small" ? 0.9 : fontSize === "large" ? 1.16 : 1;
+  return {
+    ...(palettes[mode] || palettes.light),
+    fontId: settings?.fontFamily || "sans",
+    fontFamily: getNativeFontFamily(settings?.fontFamily || "sans"),
+    fontScale,
+    fontColor: settings?.fontColor || "",
+  };
 }
 
 export const themePalettes = palettes;

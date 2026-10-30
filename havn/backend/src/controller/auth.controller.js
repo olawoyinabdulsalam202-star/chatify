@@ -492,6 +492,9 @@ export const listSessions = async (req, res) => {
     const sessions = await DeviceSession.find({ userId: req.user._id, revokedAt: null, expiresAt: { $gt: new Date() } })
       .select("platform deviceName userAgent ip lastUsedAt createdAt expiresAt")
       .sort({ lastUsedAt: -1 }).lean();
+    sessions.forEach((session) => {
+      session.current = String(session._id) === String(req.session?._id);
+    });
     res.status(200).json(sessions);
   } catch (error) {
     console.error("Session listing failed:", error.message);

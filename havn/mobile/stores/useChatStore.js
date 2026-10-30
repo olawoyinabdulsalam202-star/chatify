@@ -51,15 +51,21 @@ export const useChatStore = create((set, get) => ({
   },
   openChat: (person) => {
     const id = String(person._id);
-    set({
-      unreadCounts: { ...get().unreadCounts, [id]: 0 },
-      chats: get().chats.map((chat) => String(chat._id) === id ? { ...chat, unreadCount: 0 } : chat),
-    });
+    get().clearUnread(id);
   },
   clearUnread: (id) => {
-    const unreadCounts = { ...get().unreadCounts };
-    unreadCounts[String(id)] = 0;
-    set({ unreadCounts, chats: get().chats.map((chat) => String(chat._id) === String(id) ? { ...chat, unreadCount: 0 } : chat) });
+    const key = String(id);
+    const { chats, unreadCounts: currentCounts } = get();
+    const count = Number(currentCounts[key]) || 0;
+    const chat = chats.find((item) => String(item._id) === key);
+    const rowCount = Number(chat?.unreadCount) || 0;
+    if (!count && !rowCount) return;
+
+    const unreadCounts = count ? { ...currentCounts, [key]: 0 } : currentCounts;
+    const nextChats = rowCount
+      ? chats.map((item) => String(item._id) === key ? { ...item, unreadCount: 0 } : item)
+      : chats;
+    set({ unreadCounts, chats: nextChats });
   },
   updateFromMessage: (message, currentUserId, isOpen) => {
     const otherId = String(message.senderId) === String(currentUserId) ? String(message.receiverId) : String(message.senderId);
