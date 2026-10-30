@@ -1,19 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, AppState, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
-import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
 import Avatar from "../components/Avatar";
 import Icon from "../components/Icon";
 import { api } from "../lib/api";
-import { uploadImage } from "../lib/upload";
+import CreateStorySheet from "../components/CreateStorySheet";
 import { useTheme } from "../lib/theme";
 import { useStoryStore } from "../stores/useStoryStore";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-const STORY_COLORS = ["#C2410C", "#B45309", "#166534", "#155E75", "#7C2D4A", "#292524"];
 
 export default function StatusScreen({ embedded = false }) {
   const theme = useTheme();
@@ -28,9 +26,6 @@ export default function StatusScreen({ embedded = false }) {
   const load = useStoryStore((state) => state.load);
   const [viewer, setViewer] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [text, setText] = useState("");
-  const [color, setColor] = useState(STORY_COLORS[0]);
-  const [posting, setPosting] = useState(false);
   const [viewers, setViewers] = useState(null);
   const [reply, setReply] = useState("");
   const [liked, setLiked] = useState(false);
@@ -75,19 +70,6 @@ export default function StatusScreen({ embedded = false }) {
     if (groupIndex < 0 || groupIndex >= groups.length) return null;
     return { group: groupIndex, index: direction > 0 ? 0 : groups[groupIndex].stories.length - 1 };
   });
-  const createStory = async (media) => {
-    if (!media && !text.trim()) return;
-    setPosting(true);
-    try {
-      const payload = media ? { image: await uploadImage(media), text: text.trim() } : { text: text.trim(), backgroundColor: color };
-      await useStoryStore.getState().create(payload); setCreateOpen(false); setText("");
-    } catch (err) { Alert.alert("Status not posted", err.message); }
-    finally { setPosting(false); }
-  };
-  const pickImage = async () => {
-    const picked = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.85 });
-    if (!picked.canceled && picked.assets?.[0]) createStory(picked.assets[0]);
-  };
   const toggleLike = async () => {
     const previous = liked; setLiked(!previous);
     try { const result = await useStoryStore.getState().like(story._id); setLiked(result.liked); }
@@ -111,8 +93,8 @@ export default function StatusScreen({ embedded = false }) {
     </ScrollView>}
     {!!error && <Pressable onPress={load}><Text style={{ color: theme.danger, padding: 16 }}>{error} · Tap to retry</Text></Pressable>}
     {!groups.length && !loading && <View style={styles.empty}><Text style={[styles.emptyTitle, { color: theme.text }]}>Share a status</Text><Text style={{ color: theme.muted, textAlign: "center", marginTop: 5 }}>Post a photo or a short note for your contacts.</Text><Pressable onPress={() => setCreateOpen(true)} style={[styles.postButton, { backgroundColor: theme.primary }]}><Text style={{ color: "#FFF", fontWeight: "700" }}>Create status</Text></Pressable></View>}
-    <Modal visible={createOpen} animationType="slide" onRequestClose={() => setCreateOpen(false)}><View style={[styles.modal, { backgroundColor: theme.background }]}><View style={styles.modalHeader}><Pressable onPress={() => setCreateOpen(false)} style={styles.headerButton}><Icon name="close" color={theme.text} /></Pressable><Text style={[styles.modalTitle, { color: theme.text }]}>Create status</Text><Pressable onPress={pickImage} style={styles.headerButton}><Icon name="image" color={theme.primary} /></Pressable></View><View style={[styles.textStory, { backgroundColor: color }]}><TextInput value={text} onChangeText={(value) => setText(value.slice(0, 300))} multiline maxLength={300} placeholder="Type a status" placeholderTextColor="rgba(255,255,255,0.65)" style={styles.storyInput} /></View><View style={styles.colors}>{STORY_COLORS.map((item) => <Pressable key={item} onPress={() => setColor(item)} style={[styles.colorDot, { backgroundColor: item, borderColor: color === item ? theme.text : "transparent" }]} />)}</View><Pressable disabled={posting || !text.trim()} onPress={() => createStory(null)} style={[styles.postButton, { backgroundColor: theme.primary, opacity: !text.trim() ? 0.5 : 1 }]}><Text style={{ color: "#FFF", fontWeight: "700" }}>{posting ? "Posting" : "Post status"}</Text></Pressable></View></Modal>
-    <Modal visible={!!viewer && !!story} animationType="fade" onRequestClose={() => setViewer(null)}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}><View style={[styles.viewer, { backgroundColor: story?.backgroundColor || "#111", paddingTop: Math.max(46, insets.top + 12), paddingBottom: Math.max(12, insets.bottom) }]} onTouchStart={(event) => { const x = event.nativeEvent.pageX; const y = event.nativeEvent.pageY; if (y < 120 || y > screenHeight - 90) return; const timer = setTimeout(() => setPaused(true), 220); globalThis.__havnStoryTouch = { x, y, timer, time: Date.now() }; }} onTouchEnd={() => { const touch = globalThis.__havnStoryTouch; if (!touch) return; clearTimeout(touch.timer); const held = Date.now() - touch.time > 220; if (held) setPaused(false); else advance(touch.x < screenWidth / 2 ? -1 : 1); globalThis.__havnStoryTouch = null; }}>
+    <CreateStorySheet visible={createOpen} onClose={() => setCreateOpen(false)} />
+    <Modal visible={!!viewer && !!story} animationType="fade" presentationStyle="fullScreen" statusBarTranslucent onRequestClose={() => setViewer(null)}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}><View style={[styles.viewer, { backgroundColor: story?.backgroundColor || "#111", paddingTop: Math.max(46, insets.top + 12), paddingBottom: Math.max(12, insets.bottom) }]} onTouchStart={(event) => { const x = event.nativeEvent.pageX; const y = event.nativeEvent.pageY; if (y < 120 || y > screenHeight - 90) return; const timer = setTimeout(() => setPaused(true), 220); globalThis.__havnStoryTouch = { x, y, timer, time: Date.now() }; }} onTouchEnd={() => { const touch = globalThis.__havnStoryTouch; if (!touch) return; clearTimeout(touch.timer); const held = Date.now() - touch.time > 220; if (held) setPaused(false); else advance(touch.x < screenWidth / 2 ? -1 : 1); globalThis.__havnStoryTouch = null; }}>
       <View style={styles.progressRow}>{groups[viewer?.group]?.stories.map((item, index) => <View key={item._id} style={styles.progressTrack}><View style={[styles.progressFill, { width: index < viewer.index ? "100%" : index === viewer.index ? `${barProgress * 100}%` : "0%" }]} /></View>)}</View>
       <View style={styles.viewerHeader}><Avatar uri={author?.profilePic} name={author?.fullName} size={38} /><View style={{ flex: 1 }}><Text numberOfLines={1} style={{ color: "#FFF", fontWeight: "700" }}>{groups[viewer?.group]?.mine ? "Your status" : author?.fullName}</Text><Text style={{ color: "#EEE", fontSize: 11 }}>{story?.createdAt ? new Date(story.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : ""}</Text></View><Pressable onPress={() => setPaused((value) => !value)} style={styles.viewerControl}><Text style={{ color: "#FFF", fontWeight: "700" }}>{paused ? "Play" : "Pause"}</Text></Pressable><Pressable onPress={() => setViewer(null)} style={styles.viewerControl}><Icon name="close" color="#FFF" /></Pressable></View>
       {story?.image ? <Image source={{ uri: story.image }} contentFit="contain" style={styles.storyMedia} /> : story?.video ? <Image source={{ uri: story.video.replace("/upload/", "/upload/so_0,f_jpg/") }} contentFit="contain" style={styles.storyMedia} /> : <Text style={styles.statusText}>{story?.text}</Text>}

@@ -76,6 +76,8 @@ function RootNavigation() {
     {authUser && release?.available && <UpdateBanner />}
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background }, animation: "fade_from_bottom" }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="+not-found" />
+      <Stack.Screen name="create-group" />
       <Stack.Screen name="login" />
       <Stack.Screen name="signup" />
       <Stack.Screen name="verify" />

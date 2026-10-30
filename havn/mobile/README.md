@@ -14,6 +14,12 @@ This is the native Expo Router app. It uses Expo SDK 58 and plain JavaScript.
 
 Install Expo Go from Google Play, connect the phone and development computer to the same network, then start the project with `npx expo start`. Use the Expo Go scanner to open the project. Remote push registration is intentionally skipped in Expo Go; it requires a development or release build with native Firebase configuration.
 
+## Video status trimming
+
+The status editor previews the source video and selects a clip up to 30 seconds. The original is uploaded to Cloudinary with an eagerly generated trimmed MP4 transformation. In a development build, `react-native-video-trim` can replace the Cloudinary trim path with a native trimmer if needed.
+
+The web `frontend/src/components/CreateStoryModal.jsx` still rejects videos above 15MB before trimming. Apply the same trim and derived-size flow to the web status composer in a later change.
+
 ## Firebase file secret and EAS
 
 Do not commit `google-services.json`. For EAS, create an environment variable named `GOOGLE_SERVICES_JSON` with type **File**, upload the Firebase Android `google-services.json`, and select the same EAS environment for the build. `app.config.js` maps the file secret path to `android.googleServicesFile`. For a local EAS build, place the file at `mobile/google-services.json` instead.

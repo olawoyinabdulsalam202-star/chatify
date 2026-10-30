@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { format } from "date-fns";
@@ -49,6 +49,7 @@ export default function DirectChatScreen() {
   const error = useMessageStore((state) => state.error);
   const [draft, setDraft] = useState("");
   const [mediaBusy, setMediaBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [viewingImage, setViewingImage] = useState(null);
   const [partnerLookupDone, setPartnerLookupDone] = useState(false);
   const [, setNearBottomRender] = useState(true);
@@ -128,7 +129,8 @@ export default function DirectChatScreen() {
     if (selection.canceled || !selection.assets?.[0]) return;
     setMediaBusy(true);
     try {
-      const image = await uploadImage(selection.assets[0]);
+      setUploadProgress(0);
+      const image = await uploadImage(selection.assets[0], setUploadProgress);
       await useMessageStore.getState().send({ image });
       isNearBottom();
     } catch (uploadError) {
@@ -191,10 +193,11 @@ export default function DirectChatScreen() {
       {!!error && messages.length > 0 && <Text allowFontScaling style={[styles.sendError, { color: theme.danger }]}>{error}</Text>}
       {replyTarget && <View style={[styles.replyPreview, { backgroundColor: theme.surface, borderColor: theme.border }]}><View style={[styles.replyLine, { backgroundColor: theme.primary }]} /><View style={styles.replyCopy}><Text style={{ color: theme.primary, fontSize: 12, fontWeight: "700" }}>Replying to message</Text><Text numberOfLines={1} style={{ color: theme.text, fontSize: 13 }}>{replyTarget.text || (replyTarget.image ? "Photo" : "Message")}</Text></View><Pressable accessibilityLabel="Cancel reply" onPress={() => useMessageStore.getState().setReplyTarget(null)} style={styles.closeReply}><Icon name="close" color={theme.muted} size={19} /></Pressable></View>}
       <View style={[styles.composer, { backgroundColor: theme.background, borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Attach image" disabled={isSending || mediaBusy} onPress={pickImage} style={styles.attach}><Icon name="image" color={theme.primary} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Attach image" disabled={isSending || mediaBusy} onPress={pickImage} style={styles.attach}>{mediaBusy ? <ActivityIndicator color={theme.primary} /> : <Icon name="image" color={theme.primary} />}</Pressable>
         <TextInput allowFontScaling value={draft} onChangeText={onDraftChange} maxLength={2000} multiline placeholder="Message" placeholderTextColor={theme.muted} style={[styles.input, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border, fontFamily: theme.fontFamily, fontSize: 16 * theme.fontScale }]} />
         <Pressable accessibilityRole="button" accessibilityLabel="Send message" disabled={!draft.trim() || isSending || mediaBusy} onPress={sendText} style={[styles.send, { backgroundColor: theme.primary, opacity: !draft.trim() || isSending || mediaBusy ? 0.55 : 1 }]}>{isSending || mediaBusy ? <Text style={styles.sendBusy}>...</Text> : <Icon name="send" color="#FFFFFF" size={19} />}</Pressable>
       </View>
+      {mediaBusy && <View style={{ height: 3, backgroundColor: theme.border }}><View style={{ height: 3, width: Math.max(4, Math.round(uploadProgress * 100)) + "%", backgroundColor: theme.primary }} /></View>}
     </KeyboardAvoidingView>
     <PhotoViewer uri={viewingImage} onClose={() => setViewingImage(null)} />
   </AppScreen>;
