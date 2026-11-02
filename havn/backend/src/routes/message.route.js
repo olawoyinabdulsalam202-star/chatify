@@ -10,6 +10,7 @@ import {
   toggleReaction,
   openViewOnce,
   reportUser,
+  searchMessages,
 } from "../controller/message.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { arcjetProtection } from "../middleware/arcjet.middleware.js";
@@ -22,6 +23,7 @@ router.use(arcjetProtection, protectRoute);
 router.get("/contacts", getAllContacts);
 router.get("/chats", getChatPartners);
 router.post("/report/:userId", reportUser);
+router.get("/:id/search", searchMessages);
 router.get("/:id", getMessagesByUserId);
 router.post("/send/:id", sendMessage);
 router.put("/edit/:id", editMessage);

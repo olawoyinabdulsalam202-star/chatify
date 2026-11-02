@@ -64,4 +64,9 @@ export function bindSocketEvents(socket) {
     useMessageStore.getState().applyDeleted(message);
     useChatStore.getState().applyMessageUpdate(message);
   });
+  socket.on("viewOnceOpened", ({ messageId, viewerCount, destroyed }) => {
+    const message = useMessageStore.getState().messages.find((item) => String(item._id) === String(messageId));
+    if (message) useMessageStore.getState().applyEdited({ ...message, viewOnceOpened: true, viewOnceViewerCount: viewerCount, ...(destroyed ? { image: undefined, video: undefined } : {}) });
+    useGroupStore.getState().editMessage({ _id: messageId, viewOnceOpened: Boolean(destroyed), viewOnceViewerCount: viewerCount });
+  });
 }

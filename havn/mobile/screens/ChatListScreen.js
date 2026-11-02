@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
@@ -13,6 +13,7 @@ import { useChatStore } from "../stores/useChatStore";
 import { usePresenceStore } from "../stores/usePresenceStore";
 import GroupsScreen from "./GroupsScreen";
 import StatusScreen from "./StatusScreen";
+import AssistantFloatingButton from "../components/AssistantFloatingButton";
 
 function SearchResult({ person, onMessage }) {
   const theme = useTheme();
@@ -42,6 +43,8 @@ export default function ChatListScreen() {
   const [searchText, setSearchText] = useState("");
   const assistantName = "Havn AI";
   const [tab, setTab] = useState("chats");
+  const [showAssistantButton, setShowAssistantButton] = useState(true);
+  const lastListOffset = useRef(0);
 
   useEffect(() => { loadChats(); }, [loadChats]);
   useEffect(() => {
@@ -77,6 +80,13 @@ export default function ChatListScreen() {
       data={listData}
       keyExtractor={(item, index) => String(item?._id || (item?.assistant ? "__assistant__" : `missing-chat-${index}`))}
       contentContainerStyle={[styles.list, !safeChats.length && styles.flexGrow]}
+      onScroll={(event) => {
+        const offset = event.nativeEvent.contentOffset.y;
+        if (offset < 12 || offset < lastListOffset.current - 2) setShowAssistantButton(true);
+        else if (offset > lastListOffset.current + 2) setShowAssistantButton(false);
+        lastListOffset.current = offset;
+      }}
+      scrollEventThrottle={80}
       refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadChats({ refresh: true })} tintColor={theme.primary} colors={[theme.primary]} />}
       ListEmptyComponent={safeChats.length === 0 ? <View style={styles.empty}><Text allowFontScaling style={[styles.emptyTitle, { color: theme.text }]}>No conversations yet</Text><Text allowFontScaling style={[styles.emptyCopy, { color: theme.muted }]}>Search for a username to start a chat.</Text></View> : null}
       ListHeaderComponent={error && safeChats.length === 0 ? <Pressable onPress={() => loadChats()}><Text style={[styles.error, { color: theme.danger }]}>{error} · Tap to retry</Text></Pressable> : null}
@@ -85,9 +95,9 @@ export default function ChatListScreen() {
           ? <ChatRow assistant assistantName={assistantName} onPress={() => router.push("/assistant")} />
           : item ? <ChatRow person={item} unread={unreadCounts[String(item._id)] ?? (Number(item.unreadCount) || 0)} online={onlineUsers.includes(String(item._id))} onPress={() => openPerson(item)} /> : null}
       </RowErrorBoundary>}
-    />}</View>}
+    />}{tab === "chats" && !searching && <AssistantFloatingButton visible={showAssistantButton} onPress={() => router.push("/assistant")} />}</View>}
     <View style={[styles.tabs, { backgroundColor: theme.background, borderTopColor: theme.border }]}>{[["chats", "Chats", "message"], ["groups", "Groups", "users"], ["status", "Status", "camera"]].map(([key, label, icon]) => <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: tab === key }} onPress={() => { setTab(key); setSearchOpen(false); }} style={styles.tabButton}><Icon name={icon} color={tab === key ? theme.primary : theme.muted} size={21} /><Text style={{ color: tab === key ? theme.primary : theme.muted, fontSize: 11, fontWeight: tab === key ? "700" : "500" }}>{label}</Text></Pressable>)}</View>
   </AppScreen>;
 }
 
-const styles = StyleSheet.create({ header: { minHeight: 76, paddingHorizontal: 18, paddingVertical: 12, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 }, tabContent: { flex: 1, minHeight: 0 }, tabs: { minHeight: 58, flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, paddingBottom: 2 }, tabButton: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2 }, headingGroup: { flex: 1, minWidth: 0 }, heading: { fontSize: 27, fontWeight: "800", letterSpacing: -0.4 }, subtitle: { fontSize: 12, marginTop: 2 }, headerButton: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" }, avatarButton: { padding: 1, borderRadius: 22, borderWidth: 1 }, searchBox: { marginHorizontal: 16, marginVertical: 12, height: 48, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }, searchInput: { flex: 1, minWidth: 0, fontSize: 16, paddingVertical: 0 }, list: { paddingTop: 8, paddingBottom: 12 }, flexGrow: { flexGrow: 1 }, empty: { flex: 1, minHeight: 300, justifyContent: "center", alignItems: "center", padding: 30 }, emptyTitle: { fontSize: 20, fontWeight: "700" }, emptyCopy: { fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 8 }, error: { padding: 16, fontSize: 13 }, searchResults: { paddingHorizontal: 16 }, result: { minHeight: 70, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: StyleSheet.hairlineWidth }, resultName: { flex: 1, minWidth: 0 }, personName: { fontSize: 15, fontWeight: "700" }, personHandle: { fontSize: 12, marginTop: 2 }, messageButton: { minHeight: 38, justifyContent: "center", paddingHorizontal: 13, borderRadius: 11 }, messageButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" }, emptySearch: { padding: 24, textAlign: "center", fontSize: 14 } });
+const styles = StyleSheet.create({ header: { minHeight: 76, paddingHorizontal: 18, paddingVertical: 12, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 }, tabContent: { flex: 1, minHeight: 0, position: "relative" }, tabs: { minHeight: 58, flexDirection: "row", borderTopWidth: StyleSheet.hairlineWidth, paddingBottom: 2 }, tabButton: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2 }, headingGroup: { flex: 1, minWidth: 0 }, heading: { fontSize: 27, fontWeight: "800", letterSpacing: -0.4 }, subtitle: { fontSize: 12, marginTop: 2 }, headerButton: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" }, avatarButton: { padding: 1, borderRadius: 22, borderWidth: 1 }, searchBox: { marginHorizontal: 16, marginVertical: 12, height: 48, borderRadius: 14, borderWidth: 1, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 }, searchInput: { flex: 1, minWidth: 0, fontSize: 16, paddingVertical: 0 }, list: { paddingTop: 8, paddingBottom: 96 }, flexGrow: { flexGrow: 1 }, empty: { flex: 1, minHeight: 300, justifyContent: "center", alignItems: "center", padding: 30 }, emptyTitle: { fontSize: 20, fontWeight: "700" }, emptyCopy: { fontSize: 14, lineHeight: 21, textAlign: "center", marginTop: 8 }, error: { padding: 16, fontSize: 13 }, searchResults: { paddingHorizontal: 16 }, result: { minHeight: 70, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: StyleSheet.hairlineWidth }, resultName: { flex: 1, minWidth: 0 }, personName: { fontSize: 15, fontWeight: "700" }, personHandle: { fontSize: 12, marginTop: 2 }, messageButton: { minHeight: 38, justifyContent: "center", paddingHorizontal: 13, borderRadius: 11 }, messageButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" }, emptySearch: { padding: 24, textAlign: "center", fontSize: 14 } });

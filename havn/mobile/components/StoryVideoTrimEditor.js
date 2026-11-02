@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Image } from "expo-image";
 import { useVideoPlayer, VideoView } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
@@ -7,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Icon from "./Icon";
 
 const MAX_DURATION = 30_000;
-const MIN_DURATION = 100;
+const MIN_DURATION = 1_000;
 const MAX_SOURCE_SIZE = 100 * 1024 * 1024;
 const MAX_RESULT_SIZE = 15 * 1024 * 1024;
 
@@ -21,22 +22,62 @@ function formatSize(bytes) {
   return (megabytes < 1 ? megabytes.toFixed(1) : Math.round(megabytes)) + " MB";
 }
 
+function timeToX(time, duration, width) {
+  if (!duration || !width) return 0;
+  return Math.max(0, Math.min(width - 44, width * time / duration - 22));
+}
+
 function TrimHandle({ side, time, duration, width, color, onChange }) {
-  const origin = useRef(time);
+  const position = useRef(new Animated.Value(0)).current;
   const values = useRef({ time, duration, width, onChange });
+  const origin = useRef(0);
   values.current = { time, duration, width, onChange };
-  const responder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => { origin.current = values.current.time; },
-    onPanResponderMove: (_, gesture) => {
+
+  useEffect(() => {
+    position.setValue(timeToX(time, duration, width));
+  }, [time, duration, width, position]);
+
+  const gesture = useMemo(() => Gesture.Pan().runOnJS(true)
+    .onBegin(() => { origin.current = values.current.time; })
+    .onUpdate((event) => {
       const current = values.current;
-      if (current.width <= 0) return;
-      current.onChange(Math.round(origin.current + gesture.dx / current.width * current.duration));
-    },
-  }), []);
-  const left = width > 0 && duration > 0 ? width * time / duration + (side === "start" ? 0 : -22) : 0;
-  return <View {...responder.panHandlers} style={[styles.handle, { left, borderColor: color }]}><View style={[styles.handleLine, { backgroundColor: color }]} /></View>;
+      if (!current.width || !current.duration) return;
+      const next = origin.current + event.translationX / current.width * current.duration;
+      position.setValue(timeToX(next, current.duration, current.width));
+      current.onChange(next, side);
+    }), []);
+
+  return <GestureDetector gesture={gesture}>
+    <Animated.View style={[styles.handle, { left: position, borderColor: color }]}>
+      <View style={[styles.handleLine, { backgroundColor: color }]} />
+    </Animated.View>
+  </GestureDetector>;
+}
+
+function RangeDragArea({ start, end, duration, width, onMove }) {
+  const left = useRef(new Animated.Value(0)).current;
+  const rangeWidth = useRef(new Animated.Value(0)).current;
+  const values = useRef({ start, end, duration, width, onMove });
+  const origin = useRef({ start, end });
+  values.current = { start, end, duration, width, onMove };
+
+  useEffect(() => {
+    left.setValue(duration ? width * start / duration : 0);
+    rangeWidth.setValue(duration ? width * (end - start) / duration : width);
+  }, [start, end, duration, width, left, rangeWidth]);
+
+  const gesture = useMemo(() => Gesture.Pan().runOnJS(true)
+    .onBegin(() => { origin.current = { start: values.current.start, end: values.current.end }; })
+    .onUpdate((event) => {
+      const current = values.current;
+      if (!current.width || !current.duration) return;
+      const delta = event.translationX / current.width * current.duration;
+      current.onMove(origin.current.start + delta, origin.current.end + delta);
+    }), []);
+
+  return <GestureDetector gesture={gesture}>
+    <Animated.View style={[styles.rangeTouch, { left, width: rangeWidth }]} />
+  </GestureDetector>;
 }
 
 export default function StoryVideoTrimEditor({ asset, theme, initialLowQuality = false, onCancel, onComplete }) {
@@ -86,26 +127,41 @@ export default function StoryVideoTrimEditor({ asset, theme, initialLowQuality =
     setEnd(Math.min(MAX_DURATION, duration));
     return () => { active = false; };
   }, [asset.uri, duration]);
-  useEffect(() => {
-    if (!duration) return;
-    player.currentTime = start / 1000;
-    player.play();
-  }, [duration, start, player]);
 
-  const setStartBound = (nextValue) => {
-    const minDuration = Math.min(MIN_DURATION, duration);
-    const next = Math.max(0, Math.min(nextValue, endRef.current - minDuration));
+  const seekPreview = (milliseconds) => {
+    if (duration <= 0) return;
+    const bounded = Math.max(0, Math.min(milliseconds, duration - 50));
+    player.currentTime = bounded / 1000;
+  };
+
+  const updateStart = (value) => {
+    const minimum = Math.min(MIN_DURATION, duration);
+    const next = Math.max(0, Math.min(value, endRef.current - minimum));
     const adjustedEnd = Math.min(endRef.current, next + MAX_DURATION);
     startRef.current = next;
     endRef.current = adjustedEnd;
     setStart(next);
     setEnd(adjustedEnd);
+    seekPreview(next);
   };
-  const setEndBound = (nextValue) => {
-    const minDuration = Math.min(MIN_DURATION, duration);
-    const next = Math.max(startRef.current + minDuration, Math.min(nextValue, duration, startRef.current + MAX_DURATION));
+
+  const updateEnd = (value) => {
+    const minimum = Math.min(MIN_DURATION, duration);
+    const next = Math.max(startRef.current + minimum, Math.min(value, duration, startRef.current + MAX_DURATION));
     endRef.current = next;
     setEnd(next);
+    seekPreview(next);
+  };
+
+  const moveRange = (nextStart, nextEnd) => {
+    const selection = endRef.current - startRef.current;
+    const boundedStart = Math.max(0, Math.min(nextStart, duration - selection));
+    const boundedEnd = boundedStart + selection;
+    startRef.current = boundedStart;
+    endRef.current = boundedEnd;
+    setStart(boundedStart);
+    setEnd(boundedEnd);
+    seekPreview(boundedStart);
   };
 
   const selectionDuration = Math.max(0, end - start);
@@ -113,18 +169,17 @@ export default function StoryVideoTrimEditor({ asset, theme, initialLowQuality =
   const outputWidth = lowQuality ? 480 : 720;
   const estimatedBytes = duration > 0 ? Number(asset.fileSize || 0) * selectionDuration / duration * Math.min(1, (outputWidth / sourceWidth) ** 2) * (lowQuality ? 0.32 : 0.5) : 0;
   const sourceTooLarge = Number(asset.fileSize || 0) > MAX_SOURCE_SIZE;
-  const startLeft = duration ? width * start / duration : 0;
-  const selectionWidth = duration ? width * selectionDuration / duration : width;
 
   return <View style={[styles.container, { backgroundColor: theme.background }]}>
     <View style={styles.topBar}><Pressable accessibilityLabel="Cancel video trim" onPress={onCancel} style={styles.iconButton}><Icon name="close" color={theme.text} /></Pressable><Text style={[styles.title, { color: theme.text }]}>Trim status</Text><Pressable accessibilityRole="button" accessibilityLabel={muted ? "Unmute video" : "Mute video"} onPress={() => setMuted((value) => !value)} style={[styles.mute, { borderColor: theme.border, backgroundColor: theme.surface }]}><Icon name={muted ? "soundOff" : "sound"} color={theme.text} size={19} /><Text style={{ color: theme.text, fontSize: 12 }}>{muted ? "Muted" : "Mute"}</Text></Pressable></View>
     <VideoView player={player} style={styles.player} contentFit="contain" nativeControls />
-    <View style={styles.rangeLabels}><Text style={{ color: theme.text, fontWeight: "700" }}>{formatTime(start)} – {formatTime(end)}</Text><Text style={{ color: theme.muted }}>{formatTime(selectionDuration)} max 0:30</Text></View>
+    <View style={styles.rangeLabels}><Text style={{ color: theme.text, fontWeight: "700" }}>{formatTime(start)} - {formatTime(end)}</Text><Text style={{ color: theme.muted }}>{formatTime(selectionDuration)} max 0:30</Text></View>
     <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={[styles.timeline, { backgroundColor: theme.elevated }]}>
-      <View style={styles.frames}>{Array.from({ length: 10 }, (_, index) => frames[index] ? <Image key={String(frames[index].uri || index)} source={{ uri: frames[index].uri }} contentFit="cover" style={styles.frame} /> : <View key={String(index)} style={[styles.frame, styles.emptyFrame]} />)}</View>
-      <View pointerEvents="none" style={[styles.selection, { left: startLeft, width: selectionWidth, borderColor: theme.primary }]} />
-      <TrimHandle side="start" time={start} duration={duration} width={width} color={theme.primary} onChange={setStartBound} />
-      <TrimHandle side="end" time={end} duration={duration} width={width} color={theme.primary} onChange={setEndBound} />
+      <View pointerEvents="none" style={styles.frames}>{Array.from({ length: 10 }, (_, index) => frames[index] ? <Image key={String(frames[index].uri || index)} source={{ uri: frames[index].uri }} contentFit="cover" style={styles.frame} /> : <View key={String(index)} style={[styles.frame, styles.emptyFrame]} />)}</View>
+      <View pointerEvents="none" style={[styles.selection, { left: duration ? width * start / duration : 0, width: duration ? width * selectionDuration / duration : width, borderColor: theme.primary }]} />
+      <RangeDragArea start={start} end={end} duration={duration} width={width} onMove={moveRange} />
+      <TrimHandle side="start" time={start} duration={duration} width={width} color={theme.primary} onChange={(value) => updateStart(value)} />
+      <TrimHandle side="end" time={end} duration={duration} width={width} color={theme.primary} onChange={(value) => updateEnd(value)} />
     </View>
     <Text style={{ color: theme.muted, textAlign: "center", marginTop: 16 }}>{formatTime(selectionDuration)} - about {estimatedBytes ? formatSize(estimatedBytes) : "size unavailable"} · {outputWidth}p</Text>
     {estimatedBytes > MAX_RESULT_SIZE && <View style={styles.qualityBox}><Text style={{ color: theme.text, flex: 1, fontSize: 13 }}>This clip may exceed 15MB. Shorten it or lower the quality.</Text>{!lowQuality && <Pressable onPress={() => setLowQuality(true)} style={[styles.qualityButton, { borderColor: theme.border }]}><Text style={{ color: theme.primary, fontWeight: "700" }}>Reduce quality</Text></Pressable>}</View>}
@@ -133,4 +188,4 @@ export default function StoryVideoTrimEditor({ asset, theme, initialLowQuality =
   </View>;
 }
 
-const styles = StyleSheet.create({ container: { flex: 1, padding: 16 }, topBar: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, iconButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, title: { fontSize: 17, fontWeight: "700" }, mute: { minHeight: 40, paddingHorizontal: 10, borderWidth: 1, borderRadius: 13, flexDirection: "row", alignItems: "center", gap: 5 }, player: { width: "100%", flex: 1, minHeight: 180, maxHeight: "62%", backgroundColor: "#090807", borderRadius: 14, marginTop: 12 }, rangeLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 16 }, timeline: { height: 62, borderRadius: 9, marginTop: 12, overflow: "hidden", position: "relative" }, frames: { ...StyleSheet.absoluteFillObject, flexDirection: "row" }, frame: { flex: 1, height: 62 }, emptyFrame: { backgroundColor: "#302c28" }, selection: { position: "absolute", top: 0, bottom: 0, borderWidth: 2 }, handle: { position: "absolute", top: 0, bottom: 0, width: 22, zIndex: 3, alignItems: "center", justifyContent: "center" }, handleLine: { height: "100%", width: 4, borderRadius: 3 }, footer: { flexDirection: "row", gap: 10, marginTop: "auto", paddingTop: 18 }, cancel: { minHeight: 48, flex: 1, borderWidth: 1, borderRadius: 14, alignItems: "center", justifyContent: "center" }, useClip: { minHeight: 48, flex: 1, borderRadius: 14, alignItems: "center", justifyContent: "center" }, useText: { color: "#FFFFFF", fontWeight: "700" }, error: { textAlign: "center", marginTop: 10, fontSize: 13 }, qualityBox: { marginTop: 12, padding: 10, gap: 8, borderRadius: 12, backgroundColor: "rgba(194,65,12,0.10)" }, qualityButton: { alignSelf: "flex-start", minHeight: 38, borderWidth: 1, borderRadius: 11, justifyContent: "center", paddingHorizontal: 11 } });
+const styles = StyleSheet.create({ container: { flex: 1, padding: 16 }, topBar: { minHeight: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, iconButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, title: { fontSize: 17, fontWeight: "700" }, mute: { minHeight: 44, paddingHorizontal: 10, borderWidth: 1, borderRadius: 13, flexDirection: "row", alignItems: "center", gap: 5 }, player: { width: "100%", flex: 1, minHeight: 180, maxHeight: "62%", backgroundColor: "#090807", borderRadius: 14, marginTop: 12 }, rangeLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 16 }, timeline: { height: 62, borderRadius: 9, marginTop: 12, overflow: "hidden", position: "relative" }, frames: { ...StyleSheet.absoluteFillObject, flexDirection: "row" }, frame: { flex: 1, height: 62 }, emptyFrame: { backgroundColor: "#302c28" }, selection: { position: "absolute", top: 0, bottom: 0, borderWidth: 2 }, rangeTouch: { position: "absolute", top: 0, bottom: 0, minWidth: 44, zIndex: 2 }, handle: { position: "absolute", top: 0, bottom: 0, width: 44, zIndex: 4, alignItems: "center", justifyContent: "center" }, handleLine: { height: "100%", width: 4, borderRadius: 3 }, footer: { flexDirection: "row", gap: 10, marginTop: "auto", paddingTop: 18 }, cancel: { minHeight: 48, flex: 1, borderWidth: 1, borderRadius: 14, alignItems: "center", justifyContent: "center" }, useClip: { minHeight: 48, flex: 1, borderRadius: 14, alignItems: "center", justifyContent: "center" }, useText: { color: "#FFFFFF", fontWeight: "700" }, error: { textAlign: "center", marginTop: 10, fontSize: 13 }, qualityBox: { marginTop: 12, padding: 10, gap: 8, borderRadius: 12, backgroundColor: "rgba(194,65,12,0.10)" }, qualityButton: { alignSelf: "flex-start", minHeight: 38, borderWidth: 1, borderRadius: 11, justifyContent: "center", paddingHorizontal: 11 } });

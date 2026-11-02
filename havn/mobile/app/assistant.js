@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Clipboard, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, Vibration, View } from "react-native";
 import { useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
 import Icon from "../components/Icon";
@@ -8,6 +8,8 @@ import MessageBubble from "../components/MessageBubble";
 import { useTheme } from "../lib/theme";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useAssistantStore } from "../stores/useAssistantStore";
+import MessageActionsSheet from "../components/MessageActionsSheet";
+import ForwardMessageSheet from "../components/ForwardMessageSheet";
 
 const suggestions = [
   "Help me plan my week",
@@ -40,6 +42,8 @@ export default function AssistantScreen() {
   const clear = useAssistantStore((state) => state.clear);
   const [text, setText] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [actionMessage, setActionMessage] = useState(null);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
 
@@ -149,10 +153,15 @@ export default function AssistantScreen() {
           <Text allowFontScaling style={{ color: theme.muted, fontSize: 12 }}>{loadingOlder ? "Loading earlier messages..." : "Load earlier messages"}</Text>
         </Pressable> : null}
         ListEmptyComponent={renderEmpty}
-        renderItem={({ item }) => <MessageBubble message={item} own={item.role === "user"} />}
+        renderItem={({ item }) => <MessageBubble message={item} own={item.role === "user"} highlighted={String(actionMessage?._id) === String(item._id)} onLongPress={(message) => { Vibration.vibrate(10); setActionMessage(message); }} />}
       />}
 
       {sending && <View style={[styles.typing, { backgroundColor: theme.incoming }]}><Text allowFontScaling style={{ color: theme.muted }}>Havn AI is typing...</Text></View>}
+      <MessageActionsSheet visible={Boolean(actionMessage)} message={actionMessage} theme={theme} showReactions={false} onClose={() => setActionMessage(null)} actions={actionMessage ? [
+        ...(actionMessage.text ? [{ key: "copy", label: "Copy", icon: "copy", onPress: () => Clipboard.setString(actionMessage.text) }] : []),
+        ...(actionMessage.role === "assistant" && actionMessage.text ? [{ key: "forward", label: "Forward", icon: "forward", onPress: () => setForwardingMessage({ text: actionMessage.text }) }] : []),
+      ] : []} />
+      <ForwardMessageSheet visible={Boolean(forwardingMessage)} message={forwardingMessage} theme={theme} onClose={() => setForwardingMessage(null)} />
       {!!error && (errorType !== "history" || messages.length > 0) && <View style={[styles.error, { backgroundColor: theme.background }]}>
         <Text allowFontScaling style={[styles.errorText, { color: theme.danger }]}>{error}</Text>
         <Pressable accessibilityRole="button" onPress={retryRequest} disabled={sending} hitSlop={8}><Text allowFontScaling style={{ color: theme.primary, fontWeight: "700" }}>Retry</Text></Pressable>

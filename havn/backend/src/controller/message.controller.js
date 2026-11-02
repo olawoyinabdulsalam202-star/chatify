@@ -9,6 +9,45 @@ import { getBotUserId } from "../lib/bot.js";
 import { PUBLIC_USER_FIELDS, shapeLastSeenMany } from "../lib/publicFields.js";
 import { sendPushToUser, previewText } from "../lib/push.js";
 
+const messageSearchWindows = new Map();
+const escapeSearchTerm = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const searchMessages = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const now = Date.now();
+    const window = messageSearchWindows.get(String(userId));
+    if (window && now - window.startedAt < 60_000 && window.count >= 30) {
+      return res.status(429).json({ message: "Search is limited to 30 requests per minute." });
+    }
+    messageSearchWindows.set(String(userId), window && now - window.startedAt < 60_000
+      ? { ...window, count: window.count + 1 }
+      : { startedAt: now, count: 1 });
+
+    const { id } = req.params;
+    const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid conversation id." });
+    if (!query || query.length > 200) return res.status(400).json({ message: "Enter a search up to 200 characters." });
+    const partner = await User.exists({ _id: id });
+    if (!partner) return res.status(404).json({ message: "Conversation not found." });
+
+    const expression = new RegExp(escapeSearchTerm(query), "i");
+    const matches = await Message.find({
+      groupId: { $exists: false },
+      text: expression,
+      $or: [
+        { senderId: userId, receiverId: id },
+        { senderId: id, receiverId: userId },
+      ],
+    }).sort({ createdAt: -1 }).limit(50).select("_id text senderId createdAt isDeleted");
+
+    res.status(200).json(matches.reverse());
+  } catch (error) {
+    console.error("Error searching messages:", error.message);
+    res.status(500).json({ message: "Couldn't search this chat." });
+  }
+};
+
 export const getAllContacts = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
@@ -608,7 +647,7 @@ export const getChatPartners = async (req, res) => {
       _id: { $in: chatPartnerIds },
       isBot: { $ne: true },
       isSystem: { $ne: true },
-    }).select(`${PUBLIC_USER_FIELDS} friends`);
+    }).select(`${PUBLIC_USER_FIELDS} friends settings.awayMessage`);
 
     // $in returns documents in arbitrary order, so restore the recency order
     // computed above. Bots/system users filtered out by the query just fall out
@@ -649,7 +688,9 @@ export const getChatPartners = async (req, res) => {
           !pair.some((message) => String(message.senderId) === String(loggedInUserId));
         const shaped = partner.toObject();
         delete shaped.friends;
-        return { ...shaped, isFriend, isRequest, lastMessage, unreadCount };
+        const awayMessage = partner.settings?.awayMessage?.trim() || "";
+        delete shaped.settings;
+        return { ...shaped, ...(awayMessage ? { awayMessage } : {}), isFriend, isRequest, lastMessage, unreadCount };
       });
 
     res.status(200).json(shapeLastSeenMany(orderedPartners, req.user));

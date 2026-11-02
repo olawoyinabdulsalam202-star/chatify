@@ -4,6 +4,7 @@ import { api } from "./api";
 const FORMATS = {
   image: "jpg,jpeg,png,webp,gif",
   video: "mp4,mov,webm,mkv",
+  audio: "mp3,m4a,wav,ogg,aac",
 };
 
 export async function uploadMedia({ asset, type, onProgress, selection }) {
@@ -19,7 +20,12 @@ export async function uploadMedia({ asset, type, onProgress, selection }) {
 
   const extension = asset.fileName?.split(".").pop() || asset.uri.split(".").pop()?.split("?")[0] || (type === "video" ? "mp4" : "jpg");
   if (!FORMATS[type].split(",").includes(extension.toLowerCase())) throw new Error(`This ${type} format is not supported.`);
-  const mimeType = asset.mimeType || `${type}/${extension.toLowerCase() === "jpg" ? "jpeg" : extension.toLowerCase()}`;
+  const normalizedExtension = extension.toLowerCase();
+  const audioMimeTypes = { m4a: "audio/mp4", mp3: "audio/mpeg", aac: "audio/aac", ogg: "audio/ogg", wav: "audio/wav" };
+  const fallbackMimeType = type === "audio"
+    ? audioMimeTypes[normalizedExtension] || "audio/mp4"
+    : `${type}/${normalizedExtension === "jpg" ? "jpeg" : normalizedExtension}`;
+  const mimeType = asset.mimeType || fallbackMimeType;
   const endpoint = `https://api.cloudinary.com/v1_1/${signed.cloudName}/${signed.resourceType}/upload`;
   const task = file.createUploadTask(endpoint, {
     httpMethod: "POST",
@@ -47,6 +53,7 @@ export async function uploadMedia({ asset, type, onProgress, selection }) {
 }
 
 export const uploadImage = (asset, onProgress) => uploadMedia({ asset, type: "image", onProgress });
+export const uploadAudio = (asset, onProgress) => uploadMedia({ asset, type: "audio", onProgress });
 
 function formatSeconds(milliseconds) {
   return (Math.max(0, milliseconds) / 1000).toFixed(3).replace(/0+$/, "").replace(/\.$/, "");

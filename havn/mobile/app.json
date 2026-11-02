@@ -28,7 +28,16 @@
           "defaultChannel": "messages",
           "color": "#C2410C"
         }
-      ]
+      ],
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Havn needs the microphone to record voice messages."
+        }
+      ],
+      "expo-web-browser",
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": false
@@ -37,6 +46,9 @@
       "package": "com.kairosva.havn",
       "softwareKeyboardLayoutMode": "resize",
       "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "RECORD_AUDIO"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FAF7F2"
@@ -46,12 +58,33 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "havn.kairos-va.com", "pathPrefix": "/u/" },
-            { "scheme": "https", "host": "havn.kairos-va.com", "pathPrefix": "/qr/" }
+            {
+              "scheme": "https",
+              "host": "havn.kairos-va.com",
+              "pathPrefix": "/u/"
+            },
+            {
+              "scheme": "https",
+              "host": "havn.kairos-va.com",
+              "pathPrefix": "/qr/"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "471c59b0-a58a-490f-9308-efacf1d2edaa"
+      }
     }
   }
 }
