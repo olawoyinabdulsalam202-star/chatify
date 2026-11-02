@@ -6,6 +6,8 @@ import { socketAuthMiddleware } from "../middleware/socket.auth.middleware.js";
 import Group from "../modules/Group.js";
 import User from "../modules/User.js";
 import Message from "../modules/Message.js";
+import { randomUUID } from "node:crypto";
+import { sendPushToUser } from "./push.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -49,6 +51,51 @@ const userSocketMap = {}; // { userId: Set<socketId> }
 // return lands well inside this window; only a genuine close stays offline.
 const OFFLINE_GRACE_MS = 45000;
 const pendingOfflineTimers = {}; // { userId: Timeout }
+const pendingCalls = new Map();
+const callAttempts = new Map();
+
+function clearPendingForPair(firstId, secondId) {
+  const first = String(firstId);
+  const second = String(secondId);
+  for (const [callId, call] of pendingCalls) {
+    if ((call.from === first && call.to === second) || (call.from === second && call.to === first)) {
+      clearTimeout(call.timer);
+      pendingCalls.delete(callId);
+      sendPushToUser(call.to, { kind: "callCancelled", callId, title: "Call ended", body: "" });
+      return call;
+    }
+  }
+  return null;
+}
+
+function callRateAllowed(userId) {
+  const now = Date.now();
+  const recent = (callAttempts.get(String(userId)) || []).filter((time) => now - time < 60_000);
+  if (recent.length >= 10) return false;
+  recent.push(now);
+  callAttempts.set(String(userId), recent);
+  return true;
+}
+
+async function createCallHistory(call, callStatus, duration = 0) {
+  try {
+    const message = await Message.create({
+      senderId: call.from,
+      receiverId: call.to,
+      type: "call",
+      callStatus,
+      callType: call.callType,
+      callDuration: Math.max(0, Number(duration) || 0),
+      text: callStatus === "missed" ? `Missed ${call.callType} call` : `${call.callType === "video" ? "Video" : "Voice"} call`,
+    });
+    io.to(`user:${call.from}`).emit("newMessage", message);
+    io.to(`user:${call.to}`).emit("newMessage", message);
+    return message;
+  } catch (error) {
+    console.error("Call history write failed:", error.message);
+    return null;
+  }
+}
 
 // The single source of truth for who's online. Controllers and helpers must
 // use this, not build their own copy from the map, so presence answers can
@@ -186,6 +233,15 @@ io.on("connection", (socket) => {
   // and lets us fan a message out to every device/tab a user has open.
   socket.join(`user:${userId}`);
 
+  for (const [callId, call] of pendingCalls) {
+    if (call.to !== String(userId) || call.delivered) continue;
+    call.delivered = true;
+    io.to(socket.id).emit("incomingCall", {
+      callId, from: call.from, fromName: call.fromName, fromAvatar: call.fromAvatar,
+      fromIsBadged: call.fromIsBadged, offer: call.offer, callType: call.callType,
+    });
+  }
+
   Message.find({
     receiverId: userId,
     status: "sent",
@@ -252,7 +308,12 @@ io.on("connection", (socket) => {
   // Purely ephemeral relay: nothing here is written to the database, so no
   // call history/log is ever kept server-side.
 
-  socket.on("callUser", ({ to, offer, callType }) => {
+  socket.on("callUser", async ({ to, offer, callType }) => {
+    if (!to || !offer || !["audio", "video"].includes(callType)) return;
+    if (!callRateAllowed(userId)) {
+      socket.emit("callUnavailable", { to, message: "Too many calls. Try again in a minute." });
+      return;
+    }
     const targetSocketId = getReceiverSocketId(to);
     if (!targetSocketId) {
       // Two different situations reach here, and telling them apart matters to
@@ -260,10 +321,43 @@ io.on("connection", (socket) => {
       // reconnect grace window (still listed as online, but with no live
       // socket to deliver the offer to right now — phone just locked, tunnel,
       // app switcher). "Offline" would be a lie in the second case.
-      socket.emit("callUnavailable", { to, reconnecting: isUserOnline(to) });
+      const target = await User.findById(to).select("_id").lean().catch(() => null);
+      if (!target) {
+        socket.emit("callUnavailable", { to, reconnecting: false });
+        return;
+      }
+      const callId = randomUUID();
+      const call = {
+        callId, from: String(userId), to: String(to), fromName: socket.user.fullName,
+        fromAvatar: socket.user.profilePic || "", fromIsBadged: !!socket.user.isBadged,
+        offer, callType, createdAt: Date.now(),
+      };
+      call.timer = setTimeout(async () => {
+        if (!pendingCalls.has(callId)) return;
+        pendingCalls.delete(callId);
+        io.to(`user:${call.from}`).emit("callNoAnswer", { callId, to: call.to });
+        io.to(`user:${call.to}`).emit("callEnded", { callId, from: call.from });
+        sendPushToUser(call.to, { kind: "callCancelled", callId, title: "Call ended", body: "" });
+        const message = await createCallHistory(call, "missed");
+        sendPushToUser(call.to, {
+          title: call.fromName, body: `Missed ${call.callType} call`, senderId: call.from,
+          senderName: call.fromName, avatarUrl: call.fromAvatar, chatId: call.from,
+          kind: "dm", tag: `missed-call-${callId}`, messageId: message?._id,
+        });
+      }, 45_000);
+      pendingCalls.set(callId, call);
+      socket.emit("callRinging", { callId, to: call.to, state: "ringing offline" });
+      sendPushToUser(call.to, {
+        title: call.fromName, body: `Incoming ${call.callType} call`, senderName: call.fromName,
+        avatarUrl: call.fromAvatar, senderId: call.from, chatId: call.from, kind: "call",
+        tag: `call-${callId}`, callId, callerId: call.from, callType: call.callType,
+      });
       return;
     }
+    const callId = randomUUID();
+    socket.emit("callStarted", { callId, to: String(to) });
     io.to(targetSocketId).emit("incomingCall", {
+      callId,
       from: userId,
       fromName: socket.user.fullName,
       fromAvatar: socket.user.profilePic,
@@ -271,12 +365,27 @@ io.on("connection", (socket) => {
       offer,
       callType,
     });
+    sendPushToUser(to, {
+      title: socket.user.fullName,
+      body: `Incoming ${callType} call`,
+      senderName: socket.user.fullName,
+      avatarUrl: socket.user.profilePic || "",
+      senderId: String(userId),
+      callerId: String(userId),
+      chatId: String(userId),
+      kind: "call",
+      tag: `call-${callId}`,
+      callId,
+      callType,
+    });
   });
 
-  socket.on("answerCall", ({ to, answer }) => {
+  socket.on("answerCall", ({ to, answer, callId }) => {
+    const pending = clearPendingForPair(userId, to);
+    if (!pending && callId) sendPushToUser(userId, { kind: "callCancelled", callId, title: "Call answered", body: "" });
     const targetSocketId = getReceiverSocketId(to);
     if (targetSocketId) {
-      io.to(targetSocketId).emit("callAnswered", { from: userId, answer });
+      io.to(targetSocketId).emit("callAnswered", { from: userId, answer, callId: callId || pending?.callId });
     }
   });
 
@@ -287,18 +396,23 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("declineCall", ({ to }) => {
+  socket.on("declineCall", ({ to, callId }) => {
+    const pending = clearPendingForPair(userId, to);
+    if (!pending && callId) sendPushToUser(userId, { kind: "callCancelled", callId, title: "Call declined", body: "" });
     const targetSocketId = getReceiverSocketId(to);
     if (targetSocketId) {
-      io.to(targetSocketId).emit("callDeclined", { from: userId });
+      io.to(targetSocketId).emit("callDeclined", { from: userId, callId });
     }
   });
 
-  socket.on("endCall", ({ to }) => {
+  socket.on("endCall", async ({ to, callId, duration, callType }) => {
+    const pending = clearPendingForPair(userId, to);
     const targetSocketId = getReceiverSocketId(to);
     if (targetSocketId) {
-      io.to(targetSocketId).emit("callEnded", { from: userId });
+      io.to(targetSocketId).emit("callEnded", { from: userId, callId });
     }
+    if (!pending && duration != null) await createCallHistory({ from: String(userId), to: String(to), callType: callType === "video" ? "video" : "audio" }, "ended", duration);
+    if (!pending) sendPushToUser(to, { kind: "callCancelled", callId: callId || "", title: "Call ended", body: "" });
   });
 
   socket.on("disconnect", () => {

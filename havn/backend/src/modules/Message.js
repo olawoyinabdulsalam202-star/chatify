@@ -20,6 +20,10 @@ const messageSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Group",
     },
+    type: { type: String, enum: ["call"] },
+    callStatus: { type: String, enum: ["missed", "ended"] },
+    callType: { type: String, enum: ["audio", "video"] },
+    callDuration: { type: Number },
     text: {
       type: String,
       trim: true,

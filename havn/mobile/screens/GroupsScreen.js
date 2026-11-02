@@ -1,5 +1,6 @@
+import { showDialog } from "../lib/dialog";
 import { useEffect, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
@@ -41,7 +42,7 @@ export default function GroupsScreen({ embedded = false }) {
       }));
       setGroups(withLastMessages);
       useGroupStore.getState().setGroups(withLastMessages);
-    } catch (error) { Alert.alert("Groups", error.message); }
+    } catch (error) { showDialog("Groups", error.message); }
     finally { setLoading(false); }
   };
 

@@ -174,6 +174,19 @@ export const unblockUser = async (req, res) => {
   }
 };
 
+export const getBlockedUsers = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("blockedUsers").lean();
+    const users = await User.find({ _id: { $in: user?.blockedUsers || [] } })
+      .select("_id fullName username profilePic")
+      .lean();
+    res.status(200).json(users);
+  } catch (error) {
+    console.error("Error in getBlockedUsers:", error.message);
+    res.status(500).json({ message: "Couldn't load blocked contacts." });
+  }
+};
+
 export const removeFriend = async (req, res) => {
   try {
     const { id: friendId } = req.params;

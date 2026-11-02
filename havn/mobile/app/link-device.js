@@ -1,5 +1,6 @@
+import { showDialog } from "../lib/dialog";
 import { useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
@@ -26,15 +27,15 @@ export default function LinkDeviceScreen() {
     setBusy(true);
     try {
       const info = await api(`/auth/qr/${encodeURIComponent(code)}/info`);
-      Alert.alert(`Log in on ${info.browser || "Browser"}, ${info.operatingSystem || "device"}?`, info.city ? `From ${info.city}` : "Approve this web login?", [
+      showDialog(`Log in on ${info.browser || "Browser"}, ${info.operatingSystem || "device"}?`, info.city ? `From ${info.city}` : "Approve this web login?", [
         { text: "Cancel", style: "cancel", onPress: () => setScanned(false) },
         { text: "Approve", onPress: async () => {
-          try { await api("/auth/qr/approve", { method: "POST", body: { code } }); Alert.alert("Device linked", "You can use Havn on the web now."); router.back(); }
-          catch (error) { Alert.alert("Could not link device", error.message); setScanned(false); }
+          try { await api("/auth/qr/approve", { method: "POST", body: { code } }); showDialog("Device linked", "You can use Havn on the web now."); router.back(); }
+          catch (error) { showDialog("Could not link device", error.message); setScanned(false); }
         } },
       ]);
     } catch (error) {
-      Alert.alert("QR code unavailable", error.message, [{ text: "Scan again", onPress: () => setScanned(false) }]);
+      showDialog("QR code unavailable", error.message, [{ text: "Scan again", onPress: () => setScanned(false) }]);
     } finally { setBusy(false); }
   };
   return <AppScreen style={{ padding: 18 }}>

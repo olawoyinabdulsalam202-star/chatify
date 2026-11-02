@@ -1,5 +1,6 @@
+import { showDialog } from "../../lib/dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Clipboard, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, Vibration, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Clipboard, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, Vibration, View, useWindowDimensions } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { format } from "date-fns";
@@ -14,6 +15,7 @@ import { uploadAudio, uploadImage, uploadVideo } from "../../lib/upload";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useChatStore } from "../../stores/useChatStore";
 import { useMessageStore } from "../../stores/useMessageStore";
+import { useStickerStore } from "../../stores/useStickerStore";
 import { usePresenceStore } from "../../stores/usePresenceStore";
 import { api } from "../../lib/api";
 import { presenceLabel } from "../../lib/lastSeen";
@@ -29,6 +31,10 @@ import ViewOnceViewer from "../../components/ViewOnceViewer";
 import ChatInputBar from "../../components/ChatInputBar";
 import MediaAttachSheet from "../../components/MediaAttachSheet";
 import MediaSendPreview from "../../components/MediaSendPreview";
+import { useCallStore } from "../../stores/useCallStore";
+import MarqueeText from "../../components/MarqueeText";
+import AppSheet from "../../components/AppSheet";
+import { useBlockedStore } from "../../stores/useBlockedStore";
 
 function dayLabel(value) {
   const date = new Date(value);
@@ -67,7 +73,12 @@ export default function DirectChatScreen() {
   const [viewingOnce, setViewingOnce] = useState(null);
   const [pendingMedia, setPendingMedia] = useState(null);
   const [attachOpen, setAttachOpen] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+  const blockedContacts = useBlockedStore((state) => state.contacts);
+  const isBlocked = blockedContacts.some((contact) => String(contact._id) === String(partnerId));
+  const addBlockedContact = useBlockedStore((state) => state.block);
+  const unblockFromStore = useBlockedStore((state) => state.unblock);
+  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchMatches, setSearchMatches] = useState([]);
@@ -78,7 +89,6 @@ export default function DirectChatScreen() {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [hiddenMessageIds, setHiddenMessageIds] = useState([]);
-  const [callsOpen, setCallsOpen] = useState(false);
   const [partnerLookupDone, setPartnerLookupDone] = useState(false);
   const [, setNearBottomRender] = useState(true);
   const isNearBottom = useCallback(() => {
@@ -90,7 +100,8 @@ export default function DirectChatScreen() {
   const displayedMessages = useMemo(() => searchOpen && searchQuery.trim() ? shownMessages.filter((message) => searchMatches.some((match) => String(match._id) === String(message._id))) : shownMessages, [shownMessages, searchOpen, searchQuery, searchMatches]);
 
   useEffect(() => { loadHiddenMessages(authUser?._id).then(setHiddenMessageIds); }, [authUser?._id]);
-  useEffect(() => { let active = true; AsyncStorage.getItem(`havn.blocked.${authUser?._id}.${partnerId}`).then((value) => { if (active) setBlocked(value === "1"); }); return () => { active = false; }; }, [authUser?._id, partnerId]);
+  useEffect(() => { useBlockedStore.getState().load(); }, []);
+  const blocked = isBlocked;
 
   useEffect(() => {
     if (!partnerKnown || !partnerId || openedPartnerIdRef.current === partnerId) return;
@@ -155,10 +166,10 @@ export default function DirectChatScreen() {
     if (isSending || mediaBusy || blocked) return;
     if (source === "camera") {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) { Alert.alert("Camera permission needed", "Allow Havn to use the camera to take a photo or video."); return; }
+      if (!permission.granted) { showDialog("Camera permission needed", "Allow Havn to use the camera to take a photo or video."); return; }
     } else {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) { Alert.alert("Photo permission needed", "Allow Havn to access photos before sending media."); return; }
+      if (!permission.granted) { showDialog("Photo permission needed", "Allow Havn to access photos before sending media."); return; }
     }
     const options = { mediaTypes: ["images", "videos"], quality: 0.88, allowsEditing: false };
     const selection = source === "camera" ? await ImagePicker.launchCameraAsync(options) : await ImagePicker.launchImageLibraryAsync(options);
@@ -171,9 +182,8 @@ export default function DirectChatScreen() {
     try {
       const url = isVideo ? await uploadVideo(asset, setUploadProgress) : await uploadImage(asset, setUploadProgress);
       await useMessageStore.getState().send({ [isVideo ? "video" : "image"]: url, text: caption, ...(viewOnce ? { viewOnce: true } : {}) });
-      setPendingMedia(null);
       isNearBottom();
-    } catch (error) { Alert.alert("Media not sent", error.message); }
+    } catch (error) { throw error; }
     finally { setMediaBusy(false); }
   };
 
@@ -186,6 +196,18 @@ export default function DirectChatScreen() {
       isNearBottom();
     } finally {
       setMediaBusy(false);
+    }
+  };
+  const beginCall = async (type) => {
+    try {
+      if (!await AsyncStorage.getItem("havn.batteryPromptSeen")) {
+        useCallStore.getState().queueCall(partner, type);
+        router.push("/battery-optimization");
+        return;
+      }
+      await useCallStore.getState().startCall(partner, type);
+    } catch (error) {
+      showDialog("Call could not start", error.message || "Allow microphone and camera access, then try again.");
     }
   };
 
@@ -218,17 +240,18 @@ export default function DirectChatScreen() {
   const actionList = actionMessage ? [
     ...(!actionMessage.isDeleted ? [{ key: "reply", label: "Reply", icon: "reply", onPress: () => useMessageStore.getState().setReplyTarget(actionMessage) }] : []),
     ...(actionMessage.text ? [{ key: "copy", label: "Copy", icon: "copy", onPress: () => Clipboard.setString(actionMessage.text) }] : []),
+    ...(actionMessage.sticker && String(actionMessage.senderId) !== String(authUser?._id) ? [{ key: "save-sticker", label: "Save sticker", icon: "image", onPress: async () => { const saved = await useStickerStore.getState().saveSticker(actionMessage.sticker); if (saved) showDialog("Sticker saved", "This sticker is now in Yours."); else showDialog("Sticker not saved", useStickerStore.getState().error || "Couldn't save sticker"); } }] : []),
     ...(!actionMessage.viewOnce && !actionMessage.isDeleted ? [{ key: "forward", label: "Forward", icon: "forward", onPress: () => setForwardingMessage(actionMessage) }] : []),
     ...(String(actionMessage.senderId) === String(authUser?._id) && actionMessage.text && !actionMessage.isDeleted ? [{ key: "edit", label: "Edit", icon: "edit", onPress: () => { setEditingId(String(actionMessage._id)); setEditText(actionMessage.text); } }] : []),
     { key: "delete-me", label: "Delete for me", icon: "trash", destructive: true, onPress: async () => setHiddenMessageIds(await hideMessageForMe(authUser?._id, actionMessage._id)) },
-    ...(String(actionMessage.senderId) === String(authUser?._id) && !actionMessage.isDeleted ? [{ key: "delete-everyone", label: "Delete for everyone", icon: "trash", destructive: true, onPress: () => Alert.alert("Delete for everyone?", "This message will be removed for everyone in this chat.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: async () => { try { const updated = await api(`/messages/delete/${actionMessage._id}`, { method: "DELETE" }); useMessageStore.getState().applyDeleted(updated); } catch (error) { Alert.alert("Message not deleted", error.message); } } }]) }] : []),
+    ...(String(actionMessage.senderId) === String(authUser?._id) && !actionMessage.isDeleted ? [{ key: "delete-everyone", label: "Delete for everyone", icon: "trash", destructive: true, onPress: () => showDialog("Delete for everyone?", "This message will be removed for everyone in this chat.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: async () => { try { const updated = await api(`/messages/delete/${actionMessage._id}`, { method: "DELETE" }); useMessageStore.getState().applyDeleted(updated); } catch (error) { showDialog("Message not deleted", error.message); } } }]) }] : []),
   ] : [];
   const openViewOnce = async (message) => {
     try {
       const media = await api(`/messages/view-once/${message._id}`, { method: "POST" });
       if (media.message) useMessageStore.getState().applyEdited(media.message);
       setViewingOnce(media);
-    } catch (error) { Alert.alert("Could not open media", error.message); }
+    } catch (error) { showDialog("Could not open media", error.message); }
   };
   const searchInChat = async (query = searchQuery) => {
     const value = query.trim();
@@ -245,7 +268,7 @@ export default function DirectChatScreen() {
           setTimeout(() => listRef.current?.scrollToIndex({ index: matches.findIndex((item) => String(item._id) === String(matches[0]._id)), animated: true, viewPosition: 0.45 }), 120);
         }
       }
-    } catch (error) { Alert.alert("Search failed", error.message); }
+    } catch (error) { showDialog("Search failed", error.message); }
   };
   const moveSearch = (direction) => {
     if (!searchMatches.length) return;
@@ -259,39 +282,30 @@ export default function DirectChatScreen() {
     }
   };
   const blockContact = async () => {
-    try { await api(`/friends/block/${partnerId}`, { method: "POST" }); setBlocked(true); await AsyncStorage.setItem(`havn.blocked.${authUser?._id}.${partnerId}`, "1"); }
-    catch (error) { Alert.alert("Could not block contact", error.message); }
+    try { await api(`/friends/block/${partnerId}`, { method: "POST" }); addBlockedContact(partner); }
+    catch (error) { showDialog("Could not block contact", error.message); }
   };
   const unblockContact = async () => {
-    try { await api(`/friends/unblock/${partnerId}`, { method: "POST" }); setBlocked(false); await AsyncStorage.removeItem(`havn.blocked.${authUser?._id}.${partnerId}`); }
-    catch (error) { Alert.alert("Could not unblock contact", error.message); }
+    try { if (!await unblockFromStore(partnerId)) showDialog("Could not unblock contact", useBlockedStore.getState().error); }
+    catch (error) { showDialog("Could not unblock contact", error.message); }
   };
-  const reportContact = () => Alert.alert("Report contact", "Choose a reason", [
-    { text: "Spam", onPress: () => submitReport("Spam") },
-    { text: "Harassment", onPress: () => submitReport("Harassment") },
-    { text: "Inappropriate content", onPress: () => submitReport("Inappropriate content") },
-    { text: "Cancel", style: "cancel" },
-  ]);
-  const submitReport = async (reason) => { try { await api(`/messages/report/${partnerId}`, { method: "POST", body: { reason } }); Alert.alert("Report sent", "Thanks for helping keep Havn safe."); } catch (error) { Alert.alert("Report not sent", error.message); } };
+  const reportContact = () => { setOptionsOpen(false); setReportOpen(true); };
+  const submitReport = async (reason) => { try { await api(`/messages/report/${partnerId}`, { method: "POST", body: { reason } }); showDialog("Report sent", "Thanks for helping keep Havn safe."); } catch (error) { showDialog("Report not sent", error.message); } };
   const clearChat = async () => {
     const current = useMessageStore.getState().messages;
     setHiddenMessageIds(await hideMessagesForMe(authUser?._id, current.map((message) => message._id)));
     useMessageStore.setState({ messages: [] });
   };
-  const showChatMenu = () => Alert.alert(partner.fullName || partner.username, "Conversation options", [
-    { text: blocked ? "Unblock" : "Block", style: blocked ? "default" : "destructive", onPress: blocked ? unblockContact : () => Alert.alert("Block contact?", "They will no longer be able to message you.", [{ text: "Cancel", style: "cancel" }, { text: "Block", style: "destructive", onPress: blockContact }]) },
-    { text: "Report", onPress: reportContact },
-    { text: "Clear chat", style: "destructive", onPress: clearChat },
-  ]);
+  const showChatMenu = () => setOptionsOpen(true);
   const reactToMessage = async (emoji) => {
     try { const updated = await api(`/messages/react/${actionMessage._id}`, { method: "PUT", body: { emoji } }); useMessageStore.getState().applyEdited(updated); }
-    catch (requestError) { Alert.alert("Reaction not saved", requestError.message); }
+    catch (requestError) { showDialog("Reaction not saved", requestError.message); }
     setActionMessage(null);
   };
   const saveEdit = async () => {
     if (!editText.trim()) return;
     try { const updated = await api(`/messages/edit/${editingId}`, { method: "PUT", body: { text: editText.trim() } }); useMessageStore.getState().applyEdited(updated); setEditingId(null); }
-    catch (requestError) { Alert.alert("Message not edited", requestError.message); }
+    catch (requestError) { showDialog("Message not edited", requestError.message); }
   };
 
   if (!partner && partnerLookupDone) return <AppScreen><View style={styles.errorWrap}><Text allowFontScaling style={[styles.errorText, { color: theme.muted }]}>This conversation could not be found.</Text><Pressable onPress={() => router.back()}><Text style={{ color: theme.primary, padding: 12 }}>Back to chats</Text></Pressable></View></AppScreen>;
@@ -302,10 +316,10 @@ export default function DirectChatScreen() {
       <View style={[styles.header, { borderBottomColor: theme.border, backgroundColor: theme.background }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="Back to chats" onPress={() => router.back()} style={styles.back}><Icon name="back" color={theme.text} /></Pressable>
         <Avatar uri={partner.profilePic} name={partner.fullName} size={42} online={online} showOnline={online} />
-        <View style={styles.headerText}><Text allowFontScaling numberOfLines={1} style={[styles.name, { color: theme.fontColor || theme.text, fontFamily: theme.fontFamily, fontSize: 16 * theme.fontScale }]}>{partner.fullName || partner.username}</Text><Text allowFontScaling numberOfLines={1} style={[styles.status, { color: online ? theme.success : theme.muted, fontFamily: theme.fontFamily, fontSize: 12 * theme.fontScale }]}>{isTyping ? "typing..." : presenceLabel({ online, lastSeenAt: partner.lastSeenAt })}</Text></View>
+        <View style={styles.headerText}><MarqueeText style={[styles.name, { color: theme.fontColor || theme.text, fontFamily: theme.fontFamily, fontSize: 16 * theme.fontScale }]}>{partner.fullName || partner.username}</MarqueeText><MarqueeText style={[styles.status, { color: online ? theme.success : theme.muted, fontFamily: theme.fontFamily, fontSize: 12 * theme.fontScale }]}>{isTyping ? "typing..." : presenceLabel({ online, lastSeenAt: partner.lastSeenAt })}</MarqueeText></View>
         <Pressable accessibilityRole="button" accessibilityLabel="Search chat" onPress={() => { setSearchOpen((value) => !value); setSearchMatches([]); }} style={styles.back}><Icon name="search" color={theme.text} size={19} /></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Voice call" onPress={() => setCallsOpen(true)} style={styles.callIconButton}><Icon name="phone" color={theme.text} size={24} strokeWidth={2} /></Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Video call" onPress={() => setCallsOpen(true)} style={styles.callIconButton}><Icon name="video" color={theme.text} size={24} strokeWidth={2} /></Pressable>
+        {!blocked && String(partner._id) !== String(authUser?._id) && <><Pressable accessibilityRole="button" accessibilityLabel="Voice call" onPress={() => beginCall("audio")} style={styles.callIconButton}><Icon name="phone" color={theme.text} size={24} strokeWidth={2} /></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Video call" onPress={() => beginCall("video")} style={styles.callIconButton}><Icon name="video" color={theme.text} size={24} strokeWidth={2} /></Pressable></>}
         <Pressable accessibilityRole="button" accessibilityLabel="Conversation menu" onPress={showChatMenu} style={styles.back}><Icon name="more" color={theme.text} /></Pressable>
       </View>
       {searchOpen && <View style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}><TextInput value={searchQuery} onChangeText={setSearchQuery} onSubmitEditing={() => searchInChat()} returnKeyType="search" placeholder="Search in chat" placeholderTextColor={theme.muted} style={[styles.searchInput, { color: theme.text }]} /><Pressable onPress={() => searchInChat()}><Icon name="search" color={theme.primary} size={19} /></Pressable><Text style={{ color: theme.muted, minWidth: 36, textAlign: "center" }}>{searchMatches.length ? `${searchIndex + 1}/${searchMatches.length}` : "0/0"}</Text><Pressable accessibilityLabel="Previous match" onPress={() => moveSearch(-1)}><Icon name="back" color={theme.text} size={18} /></Pressable><Pressable accessibilityLabel="Next match" onPress={() => moveSearch(1)}><Icon name="chevron" color={theme.text} size={18} /></Pressable><Pressable onPress={() => { setSearchOpen(false); setSearchQuery(""); setSearchMatches([]); }}><Icon name="close" color={theme.muted} size={18} /></Pressable></View>}
@@ -332,6 +346,10 @@ export default function DirectChatScreen() {
       </View>
       {mediaBusy && <View style={{ height: 3, backgroundColor: theme.border }}><View style={{ height: 3, width: Math.max(4, Math.round(uploadProgress * 100)) + "%", backgroundColor: theme.primary }} /></View>}
     </KeyboardAvoidingView>
+    <AppSheet visible={optionsOpen} title={partner.fullName || partner.username || "Conversation options"} onClose={() => setOptionsOpen(false)} rows={[{ label: blocked ? "Unblock" : "Block", icon: blocked ? "check" : "ban", destructive: !blocked, onPress: () => { setOptionsOpen(false); if (blocked) unblockContact(); else showDialog("Block contact?", "They will no longer be able to message you.", [{ text: "Cancel", style: "cancel" }, { text: "Block", style: "destructive", onPress: blockContact }]); } }, { label: "Report", icon: "flag", onPress: reportContact }, { label: "Clear chat", icon: "clear", destructive: true, onPress: () => { setOptionsOpen(false); showDialog("Clear chat?", "This removes the messages from your chat view.", [{ text: "Cancel", style: "cancel" }, { text: "Clear chat", style: "destructive", onPress: clearChat }]); } }]} />
+    <AppSheet visible={reportOpen} title="Report contact" onBack={() => { setReportOpen(false); setOptionsOpen(true); }} onClose={() => setReportOpen(false)} rows={["Spam", "Harassment", "Inappropriate content"].map((reason) => ({ label: reason, icon: "flag", onPress: () => { setReportOpen(false); submitReport(reason); } }))} />
+
+
     <PhotoViewer uri={viewingImage} onClose={() => setViewingImage(null)} />
     <ViewOnceViewer visible={Boolean(viewingOnce)} media={viewingOnce} theme={theme} onClose={() => setViewingOnce(null)} />
     <MediaAttachSheet visible={attachOpen} theme={theme} onClose={() => setAttachOpen(false)} onGallery={() => chooseMedia("gallery")} onCamera={() => chooseMedia("camera")} />
@@ -339,7 +357,6 @@ export default function DirectChatScreen() {
     <MediaPickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} theme={theme} onEmoji={(emoji) => setDraft((value) => `${value}${emoji}`)} onSticker={(sticker) => useMessageStore.getState().send({ sticker })} onGif={(gif) => useMessageStore.getState().send({ gif })} />
     <MessageActionsSheet visible={Boolean(actionMessage)} message={actionMessage} theme={theme} actions={actionList} onReact={reactToMessage} onClose={() => setActionMessage(null)} />
     <ForwardMessageSheet visible={Boolean(forwardingMessage)} message={forwardingMessage} theme={theme} onClose={() => setForwardingMessage(null)} />
-    <Modal visible={callsOpen} transparent animationType="slide" onRequestClose={() => setCallsOpen(false)}><Pressable style={styles.callBackdrop} onPress={() => setCallsOpen(false)}><View style={[styles.callSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}><View style={[styles.sheetHandle, { backgroundColor: theme.border }]} /><Text style={{ color: theme.text, fontSize: 18, fontWeight: "700", textAlign: "center" }}>Calls</Text><Text style={{ color: theme.muted, textAlign: "center", lineHeight: 21, paddingVertical: 18 }}>Calls need the Havn app build. Coming in the next update.</Text><Pressable onPress={() => setCallsOpen(false)} style={[styles.callClose, { backgroundColor: theme.primary }]}><Text style={{ color: "#FFFFFF", fontWeight: "700" }}>Close</Text></Pressable></View></Pressable></Modal>
   </AppScreen>;
 }
 

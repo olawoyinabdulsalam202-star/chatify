@@ -1,5 +1,6 @@
+import { showDialog } from "../../lib/dialog";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import AppScreen from "../../components/AppScreen";
 import ActionButton from "../../components/ActionButton";
@@ -23,7 +24,7 @@ export default function QrApprovalScreen() {
   useEffect(() => { api(`/auth/qr/${encodeURIComponent(String(code || ""))}/info`).then(setInfo).catch((err) => setError(err.message)); }, [code]);
   const approve = async () => {
     setBusy(true);
-    try { await api("/auth/qr/approve", { method: "POST", body: { code } }); Alert.alert("Device linked", "You can use Havn on the web now."); router.replace("/"); }
+    try { await api("/auth/qr/approve", { method: "POST", body: { code } }); showDialog("Device linked", "You can use Havn on the web now."); router.replace("/"); }
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };

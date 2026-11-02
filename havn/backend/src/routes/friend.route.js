@@ -6,6 +6,7 @@ import {
   removeFriend,
   blockUser,
   unblockUser,
+  getBlockedUsers,
 } from "../controller/friend.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import { arcjetProtection } from "../middleware/arcjet.middleware.js";
@@ -19,6 +20,7 @@ router.get("/search", searchUsers);
 router.post("/add", addFriendByUsername);
 router.post("/block/:id", blockUser);
 router.post("/unblock/:id", unblockUser);
+router.get("/blocked", getBlockedUsers);
 router.delete("/:id", removeFriend);
 
 export default router;

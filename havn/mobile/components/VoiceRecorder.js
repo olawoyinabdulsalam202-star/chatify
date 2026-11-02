@@ -1,5 +1,6 @@
+import { showDialog } from "../lib/dialog";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, useAudioRecorderState } from "expo-audio";
 import Icon from "./Icon";
 
@@ -24,7 +25,7 @@ export default function VoiceRecorder({ theme, onCancel, onSend }) {
         const permission = await requestRecordingPermissionsAsync();
         if (!permission.granted) {
           if (!active) return;
-          Alert.alert("Microphone access needed", "Allow Havn to use the microphone to record a voice note.");
+          showDialog("Microphone access needed", "Allow Havn to use the microphone to record a voice note.");
           onCancelRef.current();
           return;
         }
@@ -36,7 +37,7 @@ export default function VoiceRecorder({ theme, onCancel, onSend }) {
         recorder.record();
       } catch (startError) {
         if (!active) return;
-        Alert.alert("Recording unavailable", startError.message || "Could not start the microphone.");
+        showDialog("Recording unavailable", startError.message || "Could not start the microphone.");
         onCancelRef.current();
       } finally {
         if (active) setStarting(false);

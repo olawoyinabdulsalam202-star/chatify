@@ -28,6 +28,18 @@ Do not commit `google-services.json`. For EAS, create an environment variable na
 
 Run `npx eas-cli login`, configure the project with `npx eas-cli build:configure`, then run `npx eas-cli build --platform android --profile preview`. The preview profile produces an installable APK. The production profile produces an Android App Bundle.
 
+## Native calling development build
+
+Voice and video calling uses `react-native-webrtc`, React Native Firebase Messaging, Notifee, and InCallManager. These native modules do not run in Expo Go. Install the dependencies from `package.json`, then create and install a fresh development build with `npx eas-cli build --platform android --profile development`. Start Metro with `npx expo start --dev-client` and open the installed Havn development client. Rebuild after changing any native dependency or Android permission.
+
+EAS must have the Android `google-services.json` file secret configured as described above. Firebase Messaging uses that configuration. The app registers the Android FCM token once through `POST /api/push/device`; Expo Notifications remains responsible for the permission/channel UI and returns the same native FCM device token. Do not register a second token provider.
+
+Configure calling on the backend with `STUN_URLS` (comma-separated STUN URLs). For production, configure a TURN service and set `TURN_URLS`, `TURN_USERNAME`, and `TURN_CREDENTIAL`. For coturn shared-secret authentication, set `TURN_URLS` and `TURN_STATIC_AUTH_SECRET`; the API returns one-hour time-based credentials. When no TURN URLs are set, the API returns the same Open Relay fallback used by the web call client. Both web and mobile fetch ICE configuration from `GET /api/calls/ice-servers`; no TURN credentials belong in a client build.
+
+Incoming-call full-screen intents require Android 14's full-screen notification permission. Havn checks it on the incoming call screen and opens the system setting when it is denied. Battery optimization settings vary by manufacturer; Havn includes a device-specific guide and a settings shortcut.
+
+Physical-device checks are required for microphone/camera permission prompts, voice and video in both directions (web-to-mobile and mobile-to-web), Bluetooth and speaker routing, lock-screen ringing and answer/decline actions, Android 14 full-screen permission, battery optimization behavior, FCM cancellation across multiple devices, and TURN connectivity on cellular and restrictive Wi-Fi. Expo export only checks the JavaScript bundle; it cannot validate those native behaviors.
+
 ## Screens and behavior
 
 - Email login, signup, OTP verification, and a browser password-reset link.

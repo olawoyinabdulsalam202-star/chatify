@@ -10,9 +10,13 @@ import { useAppStore } from "../stores/useAppStore";
 import LoadingView from "../components/LoadingView";
 import UpdateRequired from "../components/UpdateRequired";
 import UpdateBanner from "../components/UpdateBanner";
+import AppDialog from "../components/AppDialog";
+import Toast from "../components/Toast";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { loadFont } from "../lib/fonts";
+import "../lib/callNotifications";
+import { useCallStore } from "../stores/useCallStore";
 
 function compareVersion(first, second) {
   const a = String(first || "0").split(".").map(Number);
@@ -35,6 +39,7 @@ function RootNavigation() {
   const release = useAppStore((state) => state.androidRelease);
   const setAndroidRelease = useAppStore((state) => state.setAndroidRelease);
   const hydrateSound = useAppStore((state) => state.hydrateSound);
+  const callState = useCallStore((state) => state.callState);
 
   useEffect(() => {
     hydrate();
@@ -69,6 +74,11 @@ function RootNavigation() {
     if (!isHydrating && authUser && authPath) router.replace(redirect);
   }, [pathname, params.redirect, authUser, isHydrating, router]);
 
+  useEffect(() => {
+    if (isHydrating) return;
+    if (callState !== "idle" && pathname !== "/call") router.push("/call");
+  }, [callState, pathname, isHydrating, router]);
+
   if (isHydrating) return <View style={{ flex: 1, backgroundColor: theme.background }}><LoadingView label="Opening Havn" /></View>;
   if (release?.required) return <UpdateRequired />;
 
@@ -82,15 +92,20 @@ function RootNavigation() {
       <Stack.Screen name="signup" />
       <Stack.Screen name="verify" />
       <Stack.Screen name="chat/[id]" />
+      <Stack.Screen name="call" options={{ presentation: "fullScreenModal", gestureEnabled: false }} />
+      <Stack.Screen name="battery-optimization" />
       <Stack.Screen name="group/[id]" />
       <Stack.Screen name="assistant" />
       <Stack.Screen name="settings/index" />
       <Stack.Screen name="settings/[section]" />
+      <Stack.Screen name="settings/blocked" />
       <Stack.Screen name="settings/legal/[doc]" />
       <Stack.Screen name="link-device" />
       <Stack.Screen name="qr/[code]" />
       <Stack.Screen name="u/[username]" />
     </Stack>
+    <AppDialog />
+    <Toast />
   </View>;
 }
 

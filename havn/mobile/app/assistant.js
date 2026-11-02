@@ -1,5 +1,6 @@
+import { showDialog } from "../lib/dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Clipboard, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, Vibration, View } from "react-native";
+import { Clipboard, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, Vibration, View } from "react-native";
 import { useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
 import Icon from "../components/Icon";
@@ -80,7 +81,7 @@ export default function AssistantScreen() {
 
   const confirmClear = () => {
     setMenuOpen(false);
-    Alert.alert("Clear chat?", "This removes your Havn AI conversation from your account.", [
+    showDialog("Clear chat?", "This removes your Havn AI conversation from your account.", [
       { text: "Cancel", style: "cancel" },
       { text: "Clear chat", style: "destructive", onPress: async () => {
         const cleared = await clear();

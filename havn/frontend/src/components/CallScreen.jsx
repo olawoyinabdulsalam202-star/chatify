@@ -130,7 +130,7 @@ function CallScreen() {
           {peer.isBadged && <VerifiedBadge className="w-4 h-4" />}
         </h3>
         <p className="text-white/70 text-sm drop-shadow">
-          {callState === "calling" ? "Calling…" : elapsed}
+          {callState === "calling" ? "Calling…" : callState === "ringing-offline" ? "Ringing offline" : callState === "ringing" ? "Ringing" : elapsed}
         </p>
       </div>
 

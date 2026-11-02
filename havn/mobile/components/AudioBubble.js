@@ -1,5 +1,6 @@
+import { showDialog } from "../lib/dialog";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useTheme } from "../lib/theme";
 import Icon from "./Icon";
@@ -31,7 +32,7 @@ export default function AudioBubble({ src, duration, own }) {
     if (status.playing) player.pause();
     else {
       try { player.play(); }
-      catch { Alert.alert("Audio", "Couldn't play this voice note."); }
+      catch { showDialog("Audio", "Couldn't play this voice note."); }
     }
   };
 

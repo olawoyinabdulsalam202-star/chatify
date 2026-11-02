@@ -114,7 +114,8 @@ export async function sendPushToUser(userId, payload) {
     let pruned = 0;
     let failed = 0;
     let subs = [];
-    if (configured && webpush) {
+    const nativeCallSignal = payload.kind === "call" || payload.kind === "callCancelled";
+    if (configured && webpush && !nativeCallSignal) {
       subs = await PushSubscription.find({ userId });
       const body = JSON.stringify(payload);
       await Promise.all(subs.map(async (sub) => {
@@ -153,7 +154,8 @@ export async function sendPushToUser(userId, payload) {
         }
       }));
     } else {
-      console.log(`Web push skipped for ${userId}: ${configured ? "web-push transport unavailable" : "VAPID is not configured"}`);
+      const reason = nativeCallSignal ? "native call signals are FCM-only" : configured ? "web-push transport unavailable" : "VAPID is not configured";
+      console.log(`Web push skipped for ${userId}: ${reason}`);
     }
 
     const devices = await PushDevice.find({ userId }).select("_id fcmToken").lean();
@@ -169,8 +171,11 @@ export async function sendPushToUser(userId, payload) {
         chatId: payload.chatId || payload.groupId || payload.senderId || "",
         kind: payload.kind || "dm",
         tag: payload.tag || "havn-message",
+        callId: payload.callId || "",
+        callerId: payload.callerId || payload.senderId || "",
+        callType: payload.callType || "",
       }).map(([key, value]) => [key, String(value)]));
-      const call = payload.kind === "call";
+      const call = payload.kind === "call" || payload.kind === "callCancelled";
       await Promise.all(devices.map(async (device) => {
         try {
           await admin.messaging().send({

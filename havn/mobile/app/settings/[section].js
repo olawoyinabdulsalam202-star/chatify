@@ -1,5 +1,6 @@
+import { showDialog } from "../../lib/dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, AppState, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { AppState, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
@@ -243,7 +244,7 @@ export default function SettingsSection() {
     finally { setPushTestBusy(false); }
   };
 
-  const revokeDevice = (device) => Alert.alert("Sign out this device?", device.deviceName || device.platform || "Linked device", [
+  const revokeDevice = (device) => showDialog("Sign out this device?", device.deviceName || device.platform || "Linked device", [
     { text: "Cancel", style: "cancel" },
     { text: "Revoke", style: "destructive", onPress: async () => {
       setError(""); setNotice("");
@@ -251,7 +252,7 @@ export default function SettingsSection() {
       catch (err) { setError(err.message); }
     } },
   ]);
-  const logOutAll = () => Alert.alert("Log out of all devices?", "This will sign out this phone and every linked device.", [
+  const logOutAll = () => showDialog("Log out of all devices?", "This will sign out this phone and every linked device.", [
     { text: "Cancel", style: "cancel" },
     { text: "Log out all", style: "destructive", onPress: async () => {
       setSaving(true); setError("");
@@ -290,6 +291,8 @@ export default function SettingsSection() {
       <View style={styles.chipWrap}>{DISAPPEAR_OPTIONS.map((option) => { const selected = option.value === 0 ? !disappearEnabled : disappearEnabled && disappearDuration === option.value; return <Pressable key={option.value} onPress={() => { if (option.value === 0) { setDisappearEnabled(false); setDisappearDuration(0); } else { setDisappearEnabled(true); setDisappearDuration(option.value); } }} style={[styles.chip, { borderColor: selected ? theme.primary : theme.border, backgroundColor: selected ? theme.primary + "18" : theme.background }]}><Text style={{ color: selected ? theme.primary : theme.muted, fontWeight: "600" }}>{option.label}</Text></Pressable>; })}</View>
       <View style={[styles.separator, { backgroundColor: theme.border }]} />
       <Field title="Away message" helper="Shown to people who message you (optional)."><TextBox value={awayMessage} onChangeText={setAwayMessage} maxLength={200} multiline placeholder="e.g. I'll reply after 6pm" /></Field>
+      <View style={[styles.separator, { backgroundColor: theme.border }]} />
+      <Pressable accessibilityRole="button" onPress={() => router.push("/settings/blocked")} style={styles.linkRow}><View style={styles.grow}><Text style={[styles.label, { color: theme.text, fontFamily: theme.fontFamily }]}>Blocked contacts</Text><Text style={[styles.helper, { color: theme.muted, fontFamily: theme.fontFamily }]}>Review and unblock people</Text></View><Icon name="chevron" color={theme.muted} size={19} /></Pressable>
     </Card>
     <ActionButton title={saving ? "Saving" : "Save privacy"} busy={saving} onPress={() => saveSettings({ showLastSeen, awayMessage, disappearingMessages: { enabled: disappearEnabled, duration: disappearDuration } }, "Privacy settings saved.")} />
   </>;

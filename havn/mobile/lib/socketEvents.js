@@ -1,9 +1,12 @@
+import { showDialog } from "./dialog";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useChatStore } from "../stores/useChatStore";
 import { useMessageStore } from "../stores/useMessageStore";
 import { usePresenceStore } from "../stores/usePresenceStore";
 import { useGroupStore } from "../stores/useGroupStore";
 import { useStoryStore } from "../stores/useStoryStore";
+import { useCallStore } from "../stores/useCallStore";
+import {  } from "react-native";
 
 const boundSockets = new WeakSet();
 
@@ -15,6 +18,19 @@ export function bindSocketEvents(socket) {
     useMessageStore.getState().syncOpenChat();
     useChatStore.getState().loadChats({ quiet: true });
   });
+  socket.on("incomingCall", (payload) => useCallStore.getState().receiveCall(payload));
+  socket.on("callStarted", ({ callId }) => useCallStore.setState({ callId }));
+  socket.on("callAnswered", (payload) => useCallStore.getState().onAnswered(payload));
+  socket.on("iceCandidate", ({ candidate }) => useCallStore.getState().onCandidate(candidate));
+  socket.on("callDeclined", () => useCallStore.getState().finishRemoteCall("ended"));
+  socket.on("callEnded", () => useCallStore.getState().finishRemoteCall("ended"));
+  socket.on("callUnavailable", ({ message, reconnecting } = {}) => {
+    showDialog("Call unavailable", message || (reconnecting ? "This contact is reconnecting. Try again shortly." : "This contact is offline."));
+    useCallStore.getState().finishRemoteCall("ended");
+  });
+  socket.on("callNoAnswer", () => useCallStore.getState().finishRemoteCall("noAnswer"));
+  socket.on("callRinging", ({ callId, state }) => useCallStore.setState({ callId, callState: state === "ringing offline" ? "ringingOffline" : "ringing" }));
+  socket.on("callCancelled", () => useCallStore.getState().cleanup());
   socket.on("getOnlineUsers", (ids) => usePresenceStore.getState().setOnlineUsers(ids));
   socket.on("newGroupMessage", (message) => useGroupStore.getState().receive(message));
   socket.on("messageEdited", (message) => { if (message.groupId) useGroupStore.getState().editMessage(message); });

@@ -2,55 +2,16 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { startRingtone, stopRingtone, startVibration } from "../lib/audioUnlock";
+import { axiosInstance } from "../lib/axios";
 
-// STUN alone lets two callers connect directly, peer-to-peer — which means
-// each side's real IP address is visible to the other via the WebRTC
-// connection. A TURN server relays the media instead, so neither caller ever
-// sees the other's real IP.
-//
-// TURN setup, free, with automatic fallback:
-//   1. Built in, zero setup: Open Relay Project (run by Metered.ca), the
-//      standard free-and-public TURN server the WebRTC community uses when
-//      testing/prototyping. Listed on 3 different ports/transports below.
-//   2. Optional, recommended: sign up free at metered.ca (20 GB/month, no
-//      card) and set VITE_TURN_URL / VITE_TURN_USERNAME / VITE_TURN_CREDENTIAL
-//      in the frontend .env. Those get added on TOP of the built-in one below
-//      — not instead of it.
-//
-// Both sets are handed to RTCPeerConnection together. WebRTC's ICE protocol
-// gathers candidates from every server in the list *in parallel* and simply
-// uses whichever one actually connects — that's the fallback: if your
-// configured TURN account is down, over quota, or blocked on someone's
-// network, the built-in Open Relay entries are still there to pick up the
-// call, and vice versa. No extra "retry the next provider" code needed.
-const TURN_URL = import.meta.env.VITE_TURN_URL;
-const TURN_USERNAME = import.meta.env.VITE_TURN_USERNAME;
-const TURN_CREDENTIAL = import.meta.env.VITE_TURN_CREDENTIAL;
+// ICE server credentials are fetched from the authenticated API for each call.
+let ICE_SERVERS = { iceServers: [], iceTransportPolicy: "all" };
 
-const OPEN_RELAY_USERNAME = "openrelayproject";
-const OPEN_RELAY_CREDENTIAL = "openrelayproject";
-
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-    // Open Relay Project — free, public, no signup. Three transports listed
-    // so a network that blocks one port/protocol still has two other paths.
-    { urls: "turn:openrelay.metered.ca:80", username: OPEN_RELAY_USERNAME, credential: OPEN_RELAY_CREDENTIAL },
-    { urls: "turn:openrelay.metered.ca:443", username: OPEN_RELAY_USERNAME, credential: OPEN_RELAY_CREDENTIAL },
-    {
-      urls: "turn:openrelay.metered.ca:443?transport=tcp",
-      username: OPEN_RELAY_USERNAME,
-      credential: OPEN_RELAY_CREDENTIAL,
-    },
-    // Your own TURN account, if configured — extra capacity/reliability on
-    // top of the built-in fallback above, never a replacement for it.
-    ...(TURN_URL ? [{ urls: TURN_URL, username: TURN_USERNAME, credential: TURN_CREDENTIAL }] : []),
-  ],
-  // A TURN option is always present now (built-in fallback, at minimum), so
-  // media always relays and real IPs are never exposed to the other caller.
-  iceTransportPolicy: "relay",
-};
-
+async function loadIceServers() {
+  const { data } = await axiosInstance.get("/calls/ice-servers");
+  ICE_SERVERS = { iceServers: data.iceServers || [], iceTransportPolicy: data.iceTransportPolicy || "all" };
+  return ICE_SERVERS;
+}
 let peerConnection = null;
 let callSocketHandlers = null;
 
@@ -106,7 +67,7 @@ function createPeerConnection(getTargetId) {
     }
   };
 
-  // ICE_SERVERS sets iceTransportPolicy:"relay", which forbids a direct
+  // The API may require relayed media to protect each caller's IP address.
   // peer-to-peer path so neither caller can see the other's IP. The cost is
   // that a TURN server becomes mandatory: if every one of them is unreachable,
   // over quota, or rejecting the shared public credentials, ICE never finds a
@@ -121,7 +82,7 @@ function createPeerConnection(getTargetId) {
         "WebRTC ICE failed — no media route. All TURN servers are unreachable or " +
           "rejected the credentials. Because iceTransportPolicy is 'relay' (to keep " +
           "IP addresses private), there is no direct fallback. Configure your own " +
-          "TURN server via VITE_TURN_URL / VITE_TURN_USERNAME / VITE_TURN_CREDENTIAL."
+          "TURN server through the API's TURN_URLS and credential settings."
       );
       toast.error("Couldn't connect the call — no media route available");
     }
@@ -140,6 +101,7 @@ export const useCallStore = create((set, get) => ({
   callState: "idle", // idle | calling | ringing | active
   callType: null, // "audio" | "video"
   peer: null, // { id, name, avatar }
+  callId: null,
   incomingOffer: null,
   localStream: null,
   remoteStream: null,
@@ -164,6 +126,7 @@ export const useCallStore = create((set, get) => ({
         video: callType === "video",
       });
 
+      await loadIceServers();
       peerConnection = createPeerConnection(() => get().peer?.id);
       localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream));
 
@@ -206,6 +169,7 @@ export const useCallStore = create((set, get) => ({
         video: callType === "video",
       });
 
+      await loadIceServers();
       peerConnection = createPeerConnection(() => get().peer?.id);
       localStream.getTracks().forEach((track) => peerConnection.addTrack(track, localStream));
 
@@ -220,7 +184,7 @@ export const useCallStore = create((set, get) => ({
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
 
-      socket.emit("answerCall", { to: peer.id, answer });
+      socket.emit("answerCall", { to: peer.id, answer, callId: get().callId });
 
       set({ callState: "active", localStream, incomingOffer: null, callStartedAt: Date.now() });
     } catch (error) {
@@ -233,14 +197,14 @@ export const useCallStore = create((set, get) => ({
   declineCall: () => {
     const socket = useAuthStore.getState().socket;
     const { peer } = get();
-    if (socket && peer) socket.emit("declineCall", { to: peer.id });
+    if (socket && peer) socket.emit("declineCall", { to: peer.id, callId: get().callId });
     get().resetCall();
   },
 
   endCall: () => {
     const socket = useAuthStore.getState().socket;
     const { peer } = get();
-    if (socket && peer) socket.emit("endCall", { to: peer.id });
+    if (socket && peer) socket.emit("endCall", { to: peer.id, callId: get().callId, callType: get().callType, duration: get().callStartedAt ? Math.floor((Date.now() - get().callStartedAt) / 1000) : 0 });
     get().resetCall();
   },
 
@@ -277,6 +241,7 @@ export const useCallStore = create((set, get) => ({
       callState: "idle",
       callType: null,
       peer: null,
+      callId: null,
       incomingOffer: null,
       localStream: null,
       remoteStream: null,
@@ -298,7 +263,7 @@ export const useCallStore = create((set, get) => ({
     if (callSocketHandlers) return;
 
     const handlers = {
-      incomingCall: ({ from, fromName, fromAvatar, fromIsBadged, offer, callType }) => {
+      incomingCall: ({ callId, from, fromName, fromAvatar, fromIsBadged, offer, callType }) => {
         if (get().callState !== "idle") {
           // Busy — auto-decline so the caller isn't left hanging.
           socket.emit("declineCall", { to: from });
@@ -306,6 +271,7 @@ export const useCallStore = create((set, get) => ({
         }
         set({
           callState: "ringing",
+          callId,
           callType,
           peer: { id: from, name: fromName, avatar: fromAvatar, isBadged: fromIsBadged },
           incomingOffer: offer,
@@ -337,6 +303,12 @@ export const useCallStore = create((set, get) => ({
         await flushPendingCandidates();
         set({ callState: "active", callStartedAt: Date.now() });
       },
+      callNoAnswer: () => {
+        toast.error("No answer");
+        get().resetCall();
+      },
+      callStarted: ({ callId }) => set({ callId }),
+      callRinging: ({ callId, state }) => { if (state === "ringing offline") set({ callId, callState: "ringing-offline" }); },
       iceCandidate: async ({ candidate }) => {
         // Queues instead of dropping when the connection isn't ready yet.
         await addOrQueueCandidate(candidate);
