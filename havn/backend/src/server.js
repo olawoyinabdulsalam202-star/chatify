@@ -18,6 +18,7 @@ import publicRoutes from "./routes/public.route.js";
 import appRoutes from "./routes/app.route.js";
 import uploadsRoutes from "./routes/uploads.route.js";
 import callRoutes from "./routes/call.route.js";
+import settingsRoutes from "./routes/settings.route.js";
 import dns from "node:dns/promises";
 import { connectDB } from "./lib/db.js";
 import { ENV } from "./lib/env.js";
@@ -71,6 +72,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/app", appRoutes);
 app.use("/api/uploads", uploadsRoutes);
 app.use("/api/calls", callRoutes);
+app.use("/api/settings", settingsRoutes);
 
 server.listen(PORT, () => {
   console.log("Server running on port: " + PORT);

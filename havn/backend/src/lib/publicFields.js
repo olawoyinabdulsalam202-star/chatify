@@ -46,7 +46,7 @@ export function shapeLastSeen(user, viewer) {
   // Hiding yours hides everyone else's from you.
   const viewerShares = viewer?.showLastSeen !== false;
   if (!viewerShares || u.showLastSeen === false) {
-    plain.lastSeenAt = undefined;
+    plain.lastSeenAt = null;
   }
 
   // The preference itself is private — knowing someone has last-seen switched

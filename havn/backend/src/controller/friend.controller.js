@@ -3,6 +3,7 @@ import FriendRequest from "../modules/FriendRequest.js";
 import User from "../modules/User.js";
 import { io, syncPresenceForUsers } from "../lib/socket.js";
 import { PUBLIC_USER_FIELDS, shapeLastSeen } from "../lib/publicFields.js";
+import { sendPushToUser } from "../lib/push.js";
 
 // Escapes the one regex-special character a handle can legally contain (a dot)
 // plus the rest, so a typed prefix is matched literally and can never act as a
@@ -105,12 +106,13 @@ export const addFriendByUsername = async (req, res) => {
       return res.status(400).json({ message: "That's your own username." });
     }
     const [currentUser, refreshedTarget] = await Promise.all([
-      User.findById(me).select("blockedUsers"),
-      User.findById(target._id).select("blockedUsers"),
+      User.findById(me).select("blockedUsers friends"),
+      User.findById(target._id).select("blockedUsers friends"),
     ]);
     if (currentUser?.blockedUsers?.some((id) => id.equals(target._id)) || refreshedTarget?.blockedUsers?.some((id) => id.equals(me))) {
       return res.status(403).json({ message: "You cannot add this user because one of you has blocked the other." });
     }
+    const wasFriend = currentUser?.friends?.some((id) => id.equals(target._id)) && refreshedTarget?.friends?.some((id) => id.equals(me));
 
     await Promise.all([
       User.findByIdAndUpdate(me, { $addToSet: { friends: target._id } }),
@@ -129,6 +131,25 @@ export const addFriendByUsername = async (req, res) => {
       by: { _id: target._id, username: target.username, fullName: target.fullName, profilePic: target.profilePic, isBadged: target.isBadged },
     });
     await syncPresenceForUsers(me, target._id);
+
+    if (!wasFriend) {
+      try {
+        await sendPushToUser(target._id, {
+          title: req.user.fullName,
+          body: "added you as a friend",
+          kind: "friend",
+          chatId: String(me),
+          actorId: String(me),
+          senderId: String(me),
+          senderName: req.user.fullName,
+          avatarUrl: req.user.profilePic || "",
+          tag: `friend-${me}`,
+          url: `/?dm=${me}`,
+        });
+      } catch (error) {
+        console.error("Friend notification failed:", error.message);
+      }
+    }
 
     // Shaped so the last-seen reciprocity rule still applies to the object the
     // client opens the chat with.

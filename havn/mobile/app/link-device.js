@@ -8,6 +8,7 @@ import ActionButton from "../components/ActionButton";
 import Icon from "../components/Icon";
 import { api } from "../lib/api";
 import { useTheme } from "../lib/theme";
+import { registerPushDevice } from "../lib/push";
 
 function qrCode(value) {
   return String(value || "").match(/(?:havn:\/\/qr\/|\/qr\/)([A-Za-z0-9_-]+)/)?.[1] || "";
@@ -30,7 +31,7 @@ export default function LinkDeviceScreen() {
       showDialog(`Log in on ${info.browser || "Browser"}, ${info.operatingSystem || "device"}?`, info.city ? `From ${info.city}` : "Approve this web login?", [
         { text: "Cancel", style: "cancel", onPress: () => setScanned(false) },
         { text: "Approve", onPress: async () => {
-          try { await api("/auth/qr/approve", { method: "POST", body: { code } }); showDialog("Device linked", "You can use Havn on the web now."); router.back(); }
+          try { await api("/auth/qr/approve", { method: "POST", body: { code } }); registerPushDevice({ force: true, requestPermission: false }); showDialog("Device linked", "You can use Havn on the web now."); router.back(); }
           catch (error) { showDialog("Could not link device", error.message); setScanned(false); }
         } },
       ]);

@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from "react-router";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import ChatPage from "./pages/ChatPage";
 import LandingPage from "./pages/LandingPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
@@ -14,6 +14,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useChatStore } from "./store/useChatStore";
 import { useGroupStore } from "./store/useGroupStore";
 import { useCallStore } from "./store/useCallStore";
+import { useStoryStore } from "./store/useStoryStore";
 import { useEffect, useLayoutEffect, useState } from "react";
 import PageLoader from "./components/PageLoader";
 import IncomingCallModal from "./components/IncomingCallModal";
@@ -31,11 +32,15 @@ function App() {
   const { callState, subscribeToCallEvents, unsubscribeFromCallEvents } = useCallStore();
   const selectedUser = useChatStore((state) => state.selectedUser);
   const selectedGroup = useGroupStore((state) => state.selectedGroup);
+  const viewerIndex = useStoryStore((state) => state.viewerIndex);
+  const storyFeed = useStoryStore((state) => state.feed);
+  const myStories = useStoryStore((state) => state.myStories);
   const unreadCounts = useChatStore((state) => state.unreadCounts);
   const [isDocumentFocused, setIsDocumentFocused] = useState(
     () => document.visibilityState === "visible" && document.hasFocus()
   );
   const location = useLocation();
+  const navigate = useNavigate();
   const unreadTotal = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
 
   // Full-bleed public pages run edge-to-edge with their own scroll instead of the
@@ -85,6 +90,10 @@ function App() {
   useEffect(() => {
     if (!authUser || !("serviceWorker" in navigator)) return;
     const handleServiceWorkerMessage = (event) => {
+      if (event.data?.type === "NOTIFICATION_CLICK") {
+        navigate(event.data.payload?.url || "/");
+        return;
+      }
       if (event.data?.type !== "PUSH_RECEIVED") return;
       const payload = event.data.payload || {};
       if (payload.kind !== "dm" && payload.kind !== "group") return;
@@ -109,7 +118,43 @@ function App() {
     };
     navigator.serviceWorker.addEventListener("message", handleServiceWorkerMessage);
     return () => navigator.serviceWorker.removeEventListener("message", handleServiceWorkerMessage);
-  }, [authUser, location.pathname]);
+  }, [authUser, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!authUser || !location.search) return;
+    const params = new URLSearchParams(location.search);
+    const dmId = params.get("dm");
+    const groupId = params.get("group");
+    const storyId = params.get("story");
+    if (!dmId && !groupId && !storyId) return;
+    const openDestination = async () => {
+      if (dmId) {
+        const chatStore = useChatStore.getState();
+        await chatStore.getAllContacts({ quiet: true });
+        const person = [...chatStore.allContacts, ...chatStore.chats].find((item) => String(item._id) === String(dmId));
+        if (person) {
+          useGroupStore.getState().setSelectedGroup(null);
+          chatStore.setSelectedUser(person);
+        }
+      } else if (groupId) {
+        useChatStore.getState().setSelectedUser(null);
+        await useGroupStore.getState().fetchGroupDetails(groupId);
+      } else if (storyId) {
+        const storyStore = useStoryStore.getState();
+        await Promise.all([storyStore.getStoriesFeed(), storyStore.getMyStories()]);
+        const current = useStoryStore.getState();
+        const ownIndex = current.myStories.findIndex((story) => String(story._id) === String(storyId));
+        if (ownIndex >= 0) current.openViewer("mine", ownIndex);
+        else {
+          const groupIndex = current.feed.findIndex((group) => String(group.user?._id) === String(params.get("statusAuthor")) || group.stories.some((story) => String(story._id) === String(storyId)));
+          const storyIndex = current.feed[groupIndex]?.stories.findIndex((story) => String(story._id) === String(storyId)) ?? -1;
+          if (groupIndex >= 0 && storyIndex >= 0) current.openViewer(groupIndex, storyIndex);
+        }
+      }
+      navigate("/", { replace: true });
+    };
+    openDestination();
+  }, [authUser, location.search, navigate]);
 
   // Call signalling is subscribed here rather than on ChatPage so it survives
   // navigation. It re-runs when authUser changes because the socket only exists
@@ -146,8 +191,18 @@ function App() {
   // A visible Havn tab should only suppress a push for the conversation the
   // user is actually reading, not for messages arriving in another chat.
   useEffect(() => {
+    const currentStory = viewerIndex
+      ? viewerIndex.groupIndex === "mine"
+        ? myStories[viewerIndex.storyIndex]
+        : storyFeed[viewerIndex.groupIndex]?.stories?.[viewerIndex.storyIndex]
+      : null;
+    const storyAuthor = viewerIndex?.groupIndex === "mine"
+      ? authUser
+      : storyFeed[viewerIndex?.groupIndex]?.user;
     const context = location.pathname !== "/"
       ? null
+      : currentStory
+      ? { kind: "status", id: currentStory._id, storyId: currentStory._id, authorId: storyAuthor?._id }
       : selectedUser
       ? { kind: "dm", id: selectedUser._id }
       : selectedGroup
@@ -156,7 +211,7 @@ function App() {
     const message = { type: "ACTIVE_CONTEXT", context };
     navigator.serviceWorker?.controller?.postMessage(message);
     navigator.serviceWorker?.ready.then((registration) => registration.active?.postMessage(message)).catch(() => {});
-  }, [location.pathname, selectedUser, selectedGroup]);
+  }, [location.pathname, selectedUser, selectedGroup, viewerIndex, storyFeed, myStories, authUser]);
 
   // The safe-area inset padding lives on <body>, so its background is what fills
   // the notch and home-indicator gaps. The landing and legal pages are always

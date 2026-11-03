@@ -9,6 +9,7 @@ import LoadingView from "../../components/LoadingView";
 import { api } from "../../lib/api";
 import { useTheme } from "../../lib/theme";
 import { useAuthStore } from "../../stores/useAuthStore";
+import { registerPushDevice } from "../../lib/push";
 
 export default function QrApprovalScreen() {
   const { code } = useLocalSearchParams();
@@ -24,7 +25,7 @@ export default function QrApprovalScreen() {
   useEffect(() => { api(`/auth/qr/${encodeURIComponent(String(code || ""))}/info`).then(setInfo).catch((err) => setError(err.message)); }, [code]);
   const approve = async () => {
     setBusy(true);
-    try { await api("/auth/qr/approve", { method: "POST", body: { code } }); showDialog("Device linked", "You can use Havn on the web now."); router.replace("/"); }
+    try { await api("/auth/qr/approve", { method: "POST", body: { code } }); registerPushDevice({ force: true, requestPermission: false }); showDialog("Device linked", "You can use Havn on the web now."); router.replace("/"); }
     catch (err) { setError(err.message); }
     finally { setBusy(false); }
   };

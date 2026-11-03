@@ -93,6 +93,8 @@ export default function SettingsSection() {
   const [pushBusy, setPushBusy] = useState(false);
   const [pushTestBusy, setPushTestBusy] = useState(false);
   const [pushDiagnostic, setPushDiagnostic] = useState(null);
+  const [notificationPrefs, setNotificationPrefs] = useState({ messages: true, groups: true, status: true, friends: true, reactions: true });
+  const [notificationPrefsLoading, setNotificationPrefsLoading] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
@@ -114,6 +116,10 @@ export default function SettingsSection() {
   useEffect(() => {
     if (section === "notifications") {
       let active = true;
+      setNotificationPrefsLoading(true);
+      api("/settings/notifications").then((result) => {
+        if (active) setNotificationPrefs({ messages: true, groups: true, status: true, friends: true, reactions: true, ...(result.notificationPrefs || {}) });
+      }).catch((err) => { if (active) setError(err.message); }).finally(() => { if (active) setNotificationPrefsLoading(false); });
       const refreshPermission = async () => {
         if (isExpoGo()) { if (active) setPushPermission("unsupported"); return; }
         const permission = await Notifications.getPermissionsAsync();
@@ -129,6 +135,19 @@ export default function SettingsSection() {
     }
     return undefined;
   }, [section]);
+
+  const updateNotificationPrefs = async (changes) => {
+    const previous = notificationPrefs;
+    const next = { ...previous, ...changes };
+    setNotificationPrefs(next);
+    try {
+      const result = await api("/settings/notifications", { method: "PUT", body: next });
+      setNotificationPrefs({ ...next, ...(result.notificationPrefs || {}) });
+    } catch (err) {
+      setNotificationPrefs(previous);
+      setError(err.message || "Couldn't save notification preferences.");
+    }
+  };
 
   useEffect(() => {
     if (section !== "help") return undefined;
@@ -222,7 +241,7 @@ export default function SettingsSection() {
 
   const enableNotifications = async () => {
     setPushBusy(true); setError(""); setNotice("");
-    const result = await registerPushDevice();
+    const result = await registerPushDevice({ force: true });
     setPushBusy(false);
     if (result.ok) {
       setPushPermission("granted"); setPushEnabled(true); await AsyncStorage.setItem("havn.notificationsEnabled", "true").catch(() => {}); setNotice("Notifications enabled.");
@@ -320,8 +339,15 @@ export default function SettingsSection() {
       <Card><Field title="Device notifications" helper="Get notified about new messages even when Havn is closed.">
         {unsupported ? <Text style={[styles.statusCard, { color: theme.muted, backgroundColor: theme.background, borderColor: theme.border }]}>Notifications need the installed app. Expo Go does not support remote notifications.</Text>
         : pushEnabled ? <View style={[styles.statusCard, styles.statusRow, { backgroundColor: theme.background, borderColor: theme.border }]}><Text style={{ color: theme.success, flex: 1 }}>Enabled on this device</Text><Pressable disabled={pushTestBusy} onPress={sendTestNotification}><Text style={{ color: theme.primary, fontWeight: "700" }}>{pushTestBusy ? "Sending…" : "Send test notification"}</Text></Pressable><Pressable onPress={turnOffNotifications}><Text style={{ color: theme.danger, marginLeft: 12 }}>Turn off</Text></Pressable></View>
-        : blocked ? <View style={[styles.statusCard, { backgroundColor: theme.background, borderColor: theme.border }]}><Text style={{ color: theme.warning || "#B45309" }}>Notifications are blocked in Android system settings.</Text><Pressable onPress={() => Linking.openSettings()} style={{ marginTop: 12 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>Open system settings</Text></Pressable></View>
+        : pushPermission === "denied" || blocked ? <View style={[styles.statusCard, { backgroundColor: theme.background, borderColor: theme.border }]}><Text style={{ color: theme.warning || "#B45309" }}>{blocked ? "Notifications are blocked in Android system settings." : "Notifications are not enabled on this device."}</Text>{pushCanAskAgain && <Pressable disabled={pushBusy} onPress={enableNotifications} style={{ marginTop: 12 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>{pushBusy ? "Enabling…" : "Try again"}</Text></Pressable>}<Pressable onPress={() => Linking.openSettings()} style={{ marginTop: 12 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>Open Android notification settings</Text></Pressable></View>
         : <ActionButton title={pushBusy ? "Enabling…" : "Enable notifications"} busy={pushBusy} onPress={enableNotifications} />}
+      </Field><View style={[styles.separator, { backgroundColor: theme.border }]} /><Field title="Notification types" helper="Choose which events can notify you on any device.">
+        {notificationPrefsLoading ? <ActivityIndicator color={theme.primary} /> : <>
+          <ToggleRow title="Messages" value={notificationPrefs.messages} onValueChange={(value) => updateNotificationPrefs({ messages: value })} />
+          <ToggleRow title="Groups" value={notificationPrefs.groups} onValueChange={(value) => updateNotificationPrefs({ groups: value })} />
+          <ToggleRow title="Status" value={notificationPrefs.status} onValueChange={(value) => updateNotificationPrefs({ status: value })} />
+          <ToggleRow title="Friends and reactions" value={notificationPrefs.friends && notificationPrefs.reactions} onValueChange={(value) => updateNotificationPrefs({ friends: value, reactions: value })} />
+        </>}
       </Field><View style={[styles.separator, { backgroundColor: theme.border }]} /><ToggleRow title="Message sounds" description="Play a sound when a new message arrives." value={soundEnabled} onValueChange={(value) => setSoundEnabled(value)} /></Card>
       <Notice message={notice} /><Notice message={error} error />
     </>;

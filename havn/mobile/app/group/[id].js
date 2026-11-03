@@ -1,7 +1,7 @@
 import { showDialog } from "../../lib/dialog";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Clipboard, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, Vibration, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { format } from "date-fns";
 import AppScreen from "../../components/AppScreen";
@@ -21,6 +21,11 @@ import { presenceLabel } from "../../lib/lastSeen";
 import MessageBubble from "../../components/MessageBubble";
 import MarqueeText from "../../components/MarqueeText";
 import GroupInfoSheet from "../../components/GroupInfoSheet";
+import OfflineBar from "../../components/OfflineBar";
+import { useNetworkStore } from "../../lib/networkStore";
+import { showToast } from "../../lib/toast";
+import { clearChatNotifications } from "../../lib/callNotifications";
+import { clearActiveNotificationContext, setActiveNotificationContext } from "../../lib/notificationState";
 import VoiceRecorder from "../../components/VoiceRecorder";
 import MediaPickerSheet from "../../components/MediaPickerSheet";
 import { api } from "../../lib/api";
@@ -37,8 +42,10 @@ export default function GroupChatScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const isOffline = useNetworkStore((state) => state.isOffline);
   const { id: rawId } = useLocalSearchParams();
   const id = String(rawId || "");
+  const cachedGroup = useGroupStore((state) => state.groups.find((item) => String(item._id) === id));
   const listRef = useRef(null);
   const [group, setGroup] = useState(null);
   const [draft, setDraft] = useState("");
@@ -68,6 +75,12 @@ export default function GroupChatScreen() {
   const open = useGroupStore((state) => state.open);
   const close = useGroupStore((state) => state.close);
   const send = useGroupStore((state) => state.send);
+  useFocusEffect(useCallback(() => {
+    setActiveNotificationContext({ kind: "group", id });
+    clearChatNotifications(id);
+    return () => clearActiveNotificationContext("group", id);
+  }, [id]));
+  useEffect(() => { if (cachedGroup) { setGroup(cachedGroup); setEditName(cachedGroup.name || ""); setEditDescription(cachedGroup.description || ""); } }, [cachedGroup]);
   useEffect(() => { let active = true; open(id).then((result) => { if (active) { setGroup(result); setEditName(result.name || ""); setEditDescription(result.description || ""); } }).catch((error) => showDialog("Group", error.message)); return () => { active = false; clearTimeout(typingTimer.current); close(); }; }, [id]);
   useEffect(() => { loadHiddenMessages(currentUserId).then(setHiddenMessageIds); }, [currentUserId]);
   useEffect(() => {
@@ -81,9 +94,9 @@ export default function GroupChatScreen() {
     socket.on("typing", incomingTyping); socket.on("stopTyping", incomingStopTyping); socket.on("newGroupMessage", incoming); socket.on("messageEdited", changed); socket.on("messageDeleted", changed); socket.on("messageReaction", changed); socket.on("connect", rejoin);
     return () => { socket.off("typing", incomingTyping); socket.off("stopTyping", incomingStopTyping); socket.off("newGroupMessage", incoming); socket.off("messageEdited", changed); socket.off("messageDeleted", changed); socket.off("messageReaction", changed); socket.off("connect", rejoin); };
   }, [id, currentUserId, group?.members]);
-  const apiQuiet = async (groupId) => { const { api } = await import("../../lib/api"); const rows = await api(`/groups/${groupId}/messages`); useGroupStore.setState({ messages: rows }); };
+  const apiQuiet = () => useGroupStore.getState().syncOpenGroup();
   useEffect(() => { listRef.current?.scrollToEnd({ animated: true }); }, [messages.length]);
-  const sendText = async () => { const text = draft.trim(); if (!text || sending) return; setDraft(""); setSending(true); try { await send(id, { text, replyToId: replyTarget?._id }); setReplyTarget(null); } catch (error) { showDialog("Message not sent", error.message); setDraft(text); } finally { setSending(false); } };
+  const sendText = async () => { const text = draft.trim(); if (!text || sending) return; if (isOffline) { showToast("No connection", "info"); return; } setDraft(""); setSending(true); try { await send(id, { text, replyToId: replyTarget?._id }); setReplyTarget(null); } catch (error) { showDialog("Message not sent", error.message); setDraft(text); } finally { setSending(false); } };
   const chooseMedia = async (source) => {
     if (sending) return;
     if (source === "camera") {
@@ -137,7 +150,13 @@ export default function GroupChatScreen() {
   const hasGroupChanges = editName.trim() !== (group.name || "") || editDescription !== (group.description || "");
   const saveGroupDetails = async () => { if (!hasGroupChanges) return; try { const result = await api(`/groups/${id}`, { method: "PUT", body: { name: editName.trim(), description: editDescription } }); setGroup(result); setEditName(result.name || ""); setEditDescription(result.description || ""); showDialog("Group updated", "Your changes have been saved."); } catch (error) { showDialog("Couldn't update group", error.message); } };
   const chooseGroupPhoto = async () => { const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], base64: true, quality: 0.8 }); if (result.canceled || !result.assets?.[0]?.base64) return; try { const asset = result.assets[0]; const avatar = `data:${asset.mimeType || "image/jpeg"};base64,${asset.base64}`; setGroup(await api(`/groups/${id}`, { method: "PUT", body: { avatar } })); } catch (error) { showDialog("Photo not updated", error.message); } };
-  const loadContacts = async () => { try { const data = await api("/messages/contacts"); setContacts(Array.isArray(data) ? data : []); } catch (error) { showDialog("Couldn't load contacts", error.message); } };
+  const loadContacts = async () => {
+    const { readCache, writeCache } = await import("../../lib/cache");
+    const cached = await readCache("contacts");
+    if (Array.isArray(cached)) setContacts(cached);
+    try { const data = await api("/messages/contacts"); const rows = Array.isArray(data) ? data : []; setContacts(rows); writeCache("contacts", rows); }
+    catch (error) { if (error.status) showDialog("Couldn't load contacts", error.message); }
+  };
   const inviteContact = async (userId) => { try { await api(`/groups/${id}/invites`, { method: "POST", body: { memberIds: [userId] } }); showDialog("Invite sent", "The contact can now accept the group invitation."); } catch (error) { showDialog("Invite not sent", error.message); } };
   const manageMember = (member) => { const userId = String(member.userId?._id || member.userId); if (userId === String(currentUserId)) return; showDialog(member.userId?.fullName || "Member", "Group member actions", [{ text: "Cancel", style: "cancel" }, { text: member.role === "admin" ? "Make member" : "Make admin", onPress: async () => { try { await api(`/groups/${id}/members/${userId}/role`, { method: "PUT", body: { role: member.role === "admin" ? "member" : "admin" } }); await reloadGroup(); } catch (error) { showDialog("Role not changed", error.message); } } }, { text: "Remove", style: "destructive", onPress: async () => { try { await api(`/groups/${id}/members/${userId}`, { method: "DELETE" }); await reloadGroup(); } catch (error) { showDialog("Member not removed", error.message); } } }]); };
   const toggleReaction = async (message, emoji) => { try { const updated = await api(`/messages/react/${message._id}`, { method: "PUT", body: { emoji } }); useGroupStore.getState().editMessage(updated); } catch (error) { showDialog("Reaction not saved", error.message); } };
@@ -153,6 +172,7 @@ export default function GroupChatScreen() {
   ] : [];
   return <AppScreen edges={["top", "left", "right"]}><KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
     <View style={[styles.header, { borderBottomColor: theme.border }]}><Pressable onPress={() => router.back()} style={styles.back}><Icon name="back" color={theme.text} /></Pressable><Avatar uri={group.avatar} name={group.name} size={42} /><Pressable onPress={() => setInfoOpen(true)} style={{ flex: 1, minWidth: 0 }}><MarqueeText style={[styles.title, { color: theme.fontColor || theme.text, fontFamily: theme.fontFamily, fontSize: 16 * theme.fontScale }]}>{group.name}</MarqueeText><MarqueeText style={{ color: theme.muted, fontFamily: theme.fontFamily, fontSize: 12 * theme.fontScale }}>{typingIds.length ? `${group.members?.find((member) => String(member.userId?._id || member.userId) === typingIds[0])?.userId?.fullName || "Someone"} is typing` : `${group.members?.length || 0} members \u00B7 Group info`}</MarqueeText></Pressable><Pressable onPress={() => setInfoOpen(true)} style={styles.back}><Icon name="users" color={theme.text} /></Pressable></View>
+    <OfflineBar />
     <FlatList ref={listRef} data={rows} keyExtractor={(item) => String(item._id)} contentContainerStyle={{ paddingVertical: 10, flexGrow: 1 }} renderItem={({ item, index }) => {
       const rawSender = item.senderId;
       const senderId = String(rawSender?._id || rawSender);
@@ -167,7 +187,7 @@ export default function GroupChatScreen() {
       return <View style={{ marginTop: firstInRun ? 9 : 1 }}><View style={{ flexDirection: "row", alignItems: "flex-end" }}>{!mine && <View style={{ width: 36, alignItems: "center" }}>{lastInRun ? <Avatar uri={sender.profilePic} name={sender.fullName || "Member"} size={32} /> : null}</View>}<View style={{ flex: 1, minWidth: 0 }}><SwipeReplyRow own={mine} theme={theme} onReply={() => setReplyTarget(item)}><MessageBubble message={{ ...item, senderId }} own={mine} showSender={!mine && firstInRun} partnerName={sender.fullName || "Member"} senderName={sender.fullName || "Member"} highlighted={String(actionMessage?._id) === String(item._id)} editing={String(editingMessage?._id) === String(item._id)} editText={editText} onEditChange={setEditText} onCancelEdit={() => setEditingMessage(null)} onSaveEdit={async () => { try { const updated = await api(`/messages/edit/${item._id}`, { method: "PUT", body: { text: editText.trim() } }); useGroupStore.getState().editMessage(updated); setEditingMessage(null); } catch (error) { showDialog("Message not edited", error.message); } }} onLongPress={messageActions} onImagePress={setImageUri} onViewOnce={openViewOnce} viewOnceOpened={Boolean(item.viewOnceOpenedByMe || item.viewOnceViewers?.some((viewer) => String(viewer.userId?._id || viewer.userId) === String(currentUserId)))} /></SwipeReplyRow></View></View>{Array.isArray(item.reactions) && item.reactions.length > 0 && <View style={{ flexDirection: "row", gap: 5, marginLeft: 42, marginBottom: 4 }}>{[...new Set(item.reactions.map((reaction) => reaction.emoji))].map((emoji) => <Pressable key={emoji} onPress={() => toggleReaction(item, emoji)} style={{ backgroundColor: theme.surface, borderRadius: 12, paddingHorizontal: 7, paddingVertical: 3 }}><Text>{emoji} {item.reactions.filter((reaction) => reaction.emoji === emoji).length}</Text></Pressable>)}</View>}</View>;
     }} ListEmptyComponent={<View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}><Text style={{ color: theme.muted }}>Start the conversation</Text></View>} />
     {replyTarget && <View style={{ flexDirection: "row", alignItems: "center", padding: 9, backgroundColor: theme.surface }}><Text numberOfLines={1} style={{ flex: 1, color: theme.muted }}>Replying to {replyTarget.senderId?.fullName || "message"}: {replyTarget.text || "Attachment"}</Text><Pressable onPress={() => setReplyTarget(null)}><Icon name="close" color={theme.muted} size={20} /></Pressable></View>}
-    {!canPost ? <View style={[styles.composer, { borderTopColor: theme.border, paddingBottom: Math.max(8, insets.bottom) }]}><Text style={{ color: theme.muted, textAlign: "center", flex: 1, padding: 12 }}>Only admins can post in this channel.</Text></View> : <View style={[styles.composer, { borderTopColor: theme.border, paddingBottom: Math.max(8, insets.bottom) }]}><ChatInputBar theme={theme} value={draft} onChangeText={onDraftChange} onEmoji={() => setPickerOpen(true)} onAttach={() => setAttachOpen(true)} onCamera={() => chooseMedia("camera")} onSend={sendText} onRecord={() => setRecordingVoice(true)} sending={sending} recordingVoice={recordingVoice} voiceRecorder={<VoiceRecorder theme={theme} onSend={sendVoice} onCancel={() => setRecordingVoice(false)} />} /></View>}
+    {!canPost ? <View style={[styles.composer, { borderTopColor: theme.border, paddingBottom: Math.max(8, insets.bottom) }]}><Text style={{ color: theme.muted, textAlign: "center", flex: 1, padding: 12 }}>Only admins can post in this channel.</Text></View> : <View style={[styles.composer, { borderTopColor: theme.border, paddingBottom: Math.max(8, insets.bottom) }]}><ChatInputBar theme={theme} value={draft} onChangeText={onDraftChange} onEmoji={() => setPickerOpen(true)} onAttach={() => setAttachOpen(true)} onCamera={() => chooseMedia("camera")} onSend={sendText} onOffline={() => showToast("No connection", "info")} offline={isOffline} sending={sending} recordingVoice={recordingVoice} voiceRecorder={<VoiceRecorder theme={theme} onSend={sendVoice} onCancel={() => setRecordingVoice(false)} />} /></View>}
     {sending && uploadProgress > 0 && <View style={{ height: 3, backgroundColor: theme.border }}><View style={{ height: 3, width: Math.max(4, Math.round(uploadProgress * 100)) + "%", backgroundColor: theme.primary }} /></View>}
     <PhotoViewer uri={imageUri} onClose={() => setImageUri(null)} />
     <MediaAttachSheet visible={attachOpen} theme={theme} onClose={() => setAttachOpen(false)} onGallery={() => chooseMedia("gallery")} onCamera={() => chooseMedia("camera")} />
@@ -176,7 +196,7 @@ export default function GroupChatScreen() {
     <MediaPickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} theme={theme} onEmoji={(emoji) => setDraft((value) => `${value}${emoji}`)} onSticker={(sticker) => send(id, { sticker })} onGif={(gif) => send(id, { gif })} />
     <MessageActionsSheet visible={Boolean(actionMessage)} message={actionMessage} theme={theme} actions={actionList} onReact={async (emoji) => { await toggleReaction(actionMessage, emoji); setActionMessage(null); }} onClose={() => setActionMessage(null)} />
     <ForwardMessageSheet visible={Boolean(forwardingMessage)} message={forwardingMessage} theme={theme} onClose={() => setForwardingMessage(null)} />
-    <GroupInfoSheet visible={infoOpen} onClose={() => setInfoOpen(false)} theme={theme} group={group} currentUserId={currentUserId} isAdmin={isAdmin} canDelete={isAdmin || String(group.createdBy?._id || group.createdBy) === String(currentUserId)} onlineUsers={onlineUsers} editName={editName} setEditName={setEditName} editDescription={editDescription} setEditDescription={setEditDescription} hasChanges={hasGroupChanges} onSave={saveGroupDetails} contacts={contacts} onLoadContacts={loadContacts} onInvite={inviteContact} onManageMember={manageMember} onChoosePhoto={chooseGroupPhoto} onLeave={() => showDialog("Leave group?", "You will need an invitation to rejoin.", [{ text: "Cancel", style: "cancel" }, { text: "Leave group", style: "destructive", onPress: async () => { try { await api(`/groups/${id}/members/${currentUserId}`, { method: "DELETE" }); setInfoOpen(false); router.back(); } catch (error) { showDialog("Couldn't leave", error.message); } } }])} onDelete={() => showDialog("Delete group?", "This removes the group and its messages.", [{ text: "Cancel", style: "cancel" }, { text: "Delete group", style: "destructive", onPress: async () => { try { await api(`/groups/${id}`, { method: "DELETE" }); setInfoOpen(false); router.back(); } catch (error) { showDialog("Couldn't delete group", error.message); } } }])} />
+    <GroupInfoSheet visible={infoOpen} onClose={() => setInfoOpen(false)} theme={theme} group={group} currentUserId={currentUserId} isAdmin={isAdmin} canDelete={isAdmin || String(group.createdBy?._id || group.createdBy) === String(currentUserId)} onlineUsers={onlineUsers} editName={editName} setEditName={setEditName} editDescription={editDescription} setEditDescription={setEditDescription} hasChanges={hasGroupChanges} onSave={saveGroupDetails} contacts={contacts} onLoadContacts={loadContacts} onInvite={inviteContact} onManageMember={manageMember} onChoosePhoto={chooseGroupPhoto} onLeave={() => showDialog("Leave group?", "You will need an invitation to rejoin.", [{ text: "Cancel", style: "cancel" }, { text: "Leave group", style: "destructive", onPress: async () => { try { await api(`/groups/${id}/members/${currentUserId}`, { method: "DELETE" }); useGroupStore.getState().removeGroup(id); setInfoOpen(false); router.back(); } catch (error) { showDialog("Couldn't leave", error.message); } } }])} onDelete={() => showDialog("Delete group?", "This removes the group and its messages.", [{ text: "Cancel", style: "cancel" }, { text: "Delete group", style: "destructive", onPress: async () => { try { await api(`/groups/${id}`, { method: "DELETE" }); useGroupStore.getState().removeGroup(id); setInfoOpen(false); router.back(); } catch (error) { showDialog("Couldn't delete group", error.message); } } }])} />
   </KeyboardAvoidingView></AppScreen>;
 }
 

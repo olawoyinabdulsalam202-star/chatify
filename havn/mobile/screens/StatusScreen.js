@@ -2,7 +2,7 @@ import { showDialog } from "../lib/dialog";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
 import Avatar from "../components/Avatar";
 import Icon from "../components/Icon";
@@ -12,13 +12,17 @@ import { useTheme } from "../lib/theme";
 import { useStoryStore } from "../stores/useStoryStore";
 import { useAuthStore } from "../stores/useAuthStore";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { clearActiveNotificationContext, setActiveNotificationContext } from "../lib/notificationState";
 
 
-export default function StatusScreen({ embedded = false }) {
+export default function StatusScreen({ embedded = false, initialStoryId = "", initialAuthorId = "" }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const router = useRouter();
+  const routeParams = useLocalSearchParams();
+  const storyIdToOpen = initialStoryId || routeParams.story || "";
+  const authorIdToOpen = initialAuthorId || routeParams.statusAuthor || "";
   const user = useAuthStore((state) => state.authUser);
   const feed = useStoryStore((state) => state.feed);
   const mine = useStoryStore((state) => state.mine);
@@ -42,6 +46,22 @@ export default function StatusScreen({ embedded = false }) {
   const groups = [{ user: user || {}, stories: mine, mine: true }, ...feed.map((group) => ({ ...group, mine: false }))].filter((group) => group.user && group.stories?.length);
   const story = viewer ? groups[viewer.group]?.stories?.[viewer.index] : null;
   const author = viewer ? groups[viewer.group]?.user : null;
+  useEffect(() => {
+    if (!storyIdToOpen || !groups.length || loading) return;
+    const groupIndex = groups.findIndex((group) => String(group.user?._id) === String(authorIdToOpen) || group.stories.some((item) => String(item._id) === String(storyIdToOpen)));
+    if (groupIndex < 0) return;
+    const storyIndex = groups[groupIndex].stories.findIndex((item) => String(item._id) === String(storyIdToOpen));
+    if (storyIndex >= 0) {
+      setViewer({ group: groupIndex, index: storyIndex });
+      router.setParams({ story: undefined, statusAuthor: undefined });
+    }
+  }, [storyIdToOpen, authorIdToOpen, groups, loading, router]);
+  useEffect(() => {
+    if (!story || !author) return undefined;
+    const context = { kind: "status", storyId: String(story._id), authorId: String(author._id) };
+    setActiveNotificationContext(context);
+    return () => clearActiveNotificationContext("status", context.storyId);
+  }, [story?._id, author?._id]);
   const uniqueViews = new Set((story?.viewers || []).map((item) => String(item.userId?._id || item.userId)).filter(Boolean)).size;
   const uniqueLikes = new Set((story?.likes || []).map((item) => String(item.userId?._id || item.userId)).filter(Boolean)).size;
   useEffect(() => {

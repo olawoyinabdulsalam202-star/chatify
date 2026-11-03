@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Stack, useLocalSearchParams, usePathname, useRouter } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -12,10 +12,12 @@ import UpdateRequired from "../components/UpdateRequired";
 import UpdateBanner from "../components/UpdateBanner";
 import AppDialog from "../components/AppDialog";
 import Toast from "../components/Toast";
-import { View } from "react-native";
+import { AppState, View } from "react-native";
+import messaging from "@react-native-firebase/messaging";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { loadFont } from "../lib/fonts";
-import "../lib/callNotifications";
+import { nativeMessagingReady } from "../lib/callNotifications";
+import { registerPushDevice, registerPushToken } from "../lib/push";
 import { useCallStore } from "../stores/useCallStore";
 
 function compareVersion(first, second) {
@@ -34,12 +36,14 @@ function RootNavigation() {
   const pathname = usePathname();
   const params = useLocalSearchParams();
   const authUser = useAuthStore((state) => state.authUser);
+  const sessionValidated = useAuthStore((state) => state.sessionValidated);
   const isHydrating = useAuthStore((state) => state.isHydrating);
   const hydrate = useAuthStore((state) => state.hydrate);
   const release = useAppStore((state) => state.androidRelease);
   const setAndroidRelease = useAppStore((state) => state.setAndroidRelease);
   const hydrateSound = useAppStore((state) => state.hydrateSound);
   const callState = useCallStore((state) => state.callState);
+  const pushAttemptedUsers = useRef(new Set());
 
   useEffect(() => {
     hydrate();
@@ -55,6 +59,28 @@ function RootNavigation() {
       });
     }).catch((error) => console.warn("App version check failed:", error.message));
   }, [hydrate, setAndroidRelease]);
+
+  useEffect(() => {
+    if (!authUser) {
+      pushAttemptedUsers.current.clear();
+      return undefined;
+    }
+    if (!sessionValidated || !nativeMessagingReady) return undefined;
+    const userId = String(authUser._id);
+    if (!userId || pushAttemptedUsers.current.has(userId)) return undefined;
+    pushAttemptedUsers.current.add(userId);
+    registerPushDevice({ force: true });
+    const unsubscribeTokenRefresh = messaging().onTokenRefresh((token) => {
+      registerPushToken(token);
+    });
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") registerPushDevice();
+    });
+    return () => {
+      unsubscribeTokenRefresh();
+      appStateSubscription.remove();
+    };
+  }, [authUser?._id, sessionValidated]);
 
   useEffect(() => {
     const fontFamily = authUser?.settings?.fontFamily || "sans";

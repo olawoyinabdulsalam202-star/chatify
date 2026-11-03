@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
+import { readCache, writeCache } from "../lib/cache";
 
 function newestFirst(chats) {
   return [...chats].sort((a, b) => new Date(b.lastMessage?.createdAt || b.updatedAt || 0) - new Date(a.lastMessage?.createdAt || a.updatedAt || 0));
@@ -13,7 +14,15 @@ export const useChatStore = create((set, get) => ({
   isRefreshing: false,
   error: "",
   unreadCounts: {},
+  cacheHydrated: false,
+  hydrateCache: async () => {
+    if (get().cacheHydrated) return;
+    const cached = await readCache("chats");
+    if (cached && Array.isArray(cached.chats)) set({ chats: newestFirst(cached.chats.filter(Boolean)), unreadCounts: cached.unreadCounts || {}, cacheHydrated: true });
+    else set({ cacheHydrated: true });
+  },
   loadChats: async ({ quiet = false, refresh = false } = {}) => {
+    if (!get().cacheHydrated) await get().hydrateCache();
     if (!quiet) set({ isLoading: !refresh, isRefreshing: refresh, error: "" });
     try {
       const response = await api("/messages/chats");
@@ -27,9 +36,11 @@ export const useChatStore = create((set, get) => ({
       const unreadCounts = { ...get().unreadCounts };
       if (!quiet) Object.keys(unreadCounts).forEach((id) => { delete unreadCounts[id]; });
       fresh.forEach((person) => { unreadCounts[String(person._id)] = Number(person.unreadCount) || 0; });
-      set({ chats: newestFirst(merged), unreadCounts });
+      const chats = newestFirst(merged);
+      set({ chats, unreadCounts });
+      writeCache("chats", { chats, unreadCounts });
     } catch (error) {
-      if (!quiet) set({ error: error.message });
+      if (!quiet && error.status) set({ error: error.message });
     } finally {
       if (!quiet) set({ isLoading: false, isRefreshing: false });
     }
@@ -47,7 +58,11 @@ export const useChatStore = create((set, get) => ({
   rememberPerson: (person) => {
     if (!person?._id) return;
     const current = get().chats;
-    if (!current.some((item) => String(item._id) === String(person._id))) set({ chats: [person, ...current] });
+    if (!current.some((item) => String(item._id) === String(person._id))) {
+      const chats = [person, ...current];
+      set({ chats });
+      writeCache("chats", { chats, unreadCounts: get().unreadCounts });
+    }
   },
   openChat: (person) => {
     const id = String(person._id);
@@ -66,6 +81,7 @@ export const useChatStore = create((set, get) => ({
       ? chats.map((item) => String(item._id) === key ? { ...item, unreadCount: 0 } : item)
       : chats;
     set({ unreadCounts, chats: nextChats });
+    writeCache("chats", { chats: nextChats, unreadCounts });
   },
   updateFromMessage: (message, currentUserId, isOpen) => {
     const otherId = String(message.senderId) === String(currentUserId) ? String(message.receiverId) : String(message.senderId);
@@ -84,6 +100,7 @@ export const useChatStore = create((set, get) => ({
     const unreadCounts = { ...get().unreadCounts };
     unreadCounts[otherId] = unread;
     set({ chats, unreadCounts });
+    writeCache("chats", { chats, unreadCounts });
   },
   applyDelivered: (messageId) => set({
     chats: get().chats.map((chat) => String(chat.lastMessage?._id) === String(messageId)
@@ -105,5 +122,5 @@ export const useChatStore = create((set, get) => ({
     set({ chats: get().chats.map((item) => String(item._id) === String(person._id) ? { ...item, ...person, isFriend: true, isRequest: false } : item) });
   },
   updateMessage: (message) => set({ chats: get().chats.map((chat) => String(chat._id) === String(message.receiverId || message.senderId) ? { ...chat, lastMessage: message } : chat) }),
-  reset: () => set({ chats: [], searchResults: [], query: "", isLoading: false, isRefreshing: false, error: "", unreadCounts: {} }),
+  reset: () => set({ chats: [], searchResults: [], query: "", isLoading: false, isRefreshing: false, error: "", unreadCounts: {}, cacheHydrated: false }),
 }));

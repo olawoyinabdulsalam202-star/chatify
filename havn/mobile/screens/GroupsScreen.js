@@ -1,5 +1,5 @@
 import { showDialog } from "../lib/dialog";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { formatDistanceToNow } from "date-fns";
 import { useRouter } from "expo-router";
@@ -24,35 +24,26 @@ function previewText(message) {
 export default function GroupsScreen({ embedded = false }) {
   const theme = useTheme();
   const router = useRouter();
-  const [groups, setGroups] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const groups = useGroupStore((state) => state.groups);
+  const loading = useGroupStore((state) => state.isLoading);
   const unread = useGroupStore((state) => state.unread);
-  const storedGroups = useGroupStore((state) => state.groups);
+  const loadGroups = useGroupStore((state) => state.load);
+  const setGroups = useGroupStore((state) => state.setGroups);
 
   const load = async () => {
-    setLoading(true);
-    try {
-      const result = await api("/groups");
-      const rows = Array.isArray(result) ? result.filter(Boolean) : [];
-      const withLastMessages = await Promise.all(rows.map(async (group) => {
-        try {
-          const messages = await api("/groups/" + group._id + "/messages");
-          return { ...group, lastMessage: Array.isArray(messages) ? messages[messages.length - 1] : null };
-        } catch { return group; }
-      }));
-      setGroups(withLastMessages);
-      useGroupStore.getState().setGroups(withLastMessages);
-    } catch (error) { showDialog("Groups", error.message); }
-    finally { setLoading(false); }
+    await loadGroups();
+    const rows = useGroupStore.getState().groups.filter(Boolean);
+    const withLastMessages = await Promise.all(rows.map(async (group) => {
+      try {
+        const messages = await api("/groups/" + group._id + "/messages");
+        const newest = Array.isArray(messages) ? messages[messages.length - 1] : null;
+        return newest ? { ...group, lastMessage: newest } : group;
+      } catch { return group; }
+    }));
+    setGroups(withLastMessages);
   };
 
   useEffect(() => { load(); }, []);
-  useEffect(() => {
-    setGroups((current) => current.map((group) => {
-      const stored = storedGroups.find((item) => String(item._id) === String(group._id));
-      return stored?.lastMessage ? { ...group, lastMessage: stored.lastMessage } : group;
-    }));
-  }, [storedGroups]);
 
   if (loading && !groups.length) return <AppScreen edges={embedded ? [] : undefined}><LoadingView label="Loading groups" /></AppScreen>;
   return <AppScreen edges={embedded ? [] : undefined}>

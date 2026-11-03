@@ -150,6 +150,21 @@ self.addEventListener("fetch", (event) => {
 let badgeCount = 0;
 const activeContexts = new Map();
 
+function notificationTargetIsOpen(data, context) {
+  if (!context) return false;
+  if (["dm", "status-reply"].includes(data.kind)) return context.kind === "dm" && String(context.id) === String(data.chatId || data.senderId);
+  if (data.kind === "reaction") {
+    const targetKind = data.targetType === "group" || data.groupId ? "group" : "dm";
+    return context.kind === targetKind && String(context.id) === String(targetKind === "group" ? data.groupId || data.chatId : data.chatId);
+  }
+  if (["group", "group-added"].includes(data.kind)) return context.kind === "group" && String(context.id) === String(data.groupId || data.chatId);
+  if (["status", "status-new"].includes(data.kind)) {
+    return context.kind === "status" && (String(context.storyId) === String(data.storyId || data.chatId) || String(context.authorId) === String(data.authorId));
+  }
+  if (data.kind === "friend") return context.kind === "dm" && String(context.id) === String(data.chatId);
+  return false;
+}
+
 function setBadge(count) {
   if ("setAppBadge" in self.navigator) {
     // Fails harmlessly on platforms that don't support badging (most desktop
@@ -184,10 +199,7 @@ self.addEventListener("push", (event) => {
       const hasRelevantVisibleWindow = clientList.some((c) => {
         if (c.visibilityState !== "visible") return false;
         const context = activeContexts.get(c.id);
-        if (!context) return false;
-        if (data.kind === "dm") return context.kind === "dm" && String(context.id) === String(data.senderId);
-        if (data.kind === "group") return context.kind === "group" && String(context.id) === String(data.groupId);
-        return false;
+        return notificationTargetIsOpen(data, context);
       });
 
       if (hasRelevantVisibleWindow) return;
@@ -199,7 +211,7 @@ self.addEventListener("push", (event) => {
         body: data.body || "New message",
         // The sender's profile picture, like Telegram/WhatsApp — falls back
         // to the app icon for system messages or accounts with no photo.
-        icon: data.icon || "/icon.svg",
+        icon: data.avatarUrl || data.icon || "/icon.svg",
         // `badge` is the small monochrome status-bar glyph on Android, not
         // the app-icon number badge (that's setAppBadge below) — always the
         // app icon here regardless of sender, since a photo gets crushed to
@@ -212,7 +224,7 @@ self.addEventListener("push", (event) => {
         requireInteraction: false,
         silent: false,
         actions: [
-          { action: "open", title: "Open chat" },
+          { action: "open", title: "Open Havn" },
           { action: "dismiss", title: "Dismiss" },
         ],
         // Vibration is the only alert that reliably works when the screen is

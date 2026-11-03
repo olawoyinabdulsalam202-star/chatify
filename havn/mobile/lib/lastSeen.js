@@ -9,5 +9,5 @@ export function formatLastSeen(value) {
 }
 
 export function presenceLabel({ online, lastSeenAt }) {
-  return online ? "Online" : formatLastSeen(lastSeenAt) || "Offline";
+  return online ? "Online" : formatLastSeen(lastSeenAt) || "";
 }

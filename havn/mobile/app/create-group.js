@@ -11,6 +11,7 @@ import { api } from "../lib/api";
 import { uploadImage } from "../lib/upload";
 import { useTheme } from "../lib/theme";
 import { useGroupStore } from "../stores/useGroupStore";
+import { readCache, writeCache } from "../lib/cache";
 
 export default function CreateGroupScreen() {
   const theme = useTheme();
@@ -29,7 +30,14 @@ export default function CreateGroupScreen() {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
-    api("/messages/contacts").then((result) => setContacts(Array.isArray(result) ? result : [])).catch((error) => showDialog("Contacts", error.message));
+    let active = true;
+    readCache("contacts").then((cached) => { if (active && Array.isArray(cached)) setContacts(cached); });
+    api("/messages/contacts").then((result) => {
+      const rows = Array.isArray(result) ? result : [];
+      if (active) setContacts(rows);
+      writeCache("contacts", rows);
+    }).catch((error) => { if (active && error.status) showDialog("Contacts", error.message); });
+    return () => { active = false; };
   }, []);
 
   const visibleContacts = useMemo(() => contacts.filter((contact) => `${contact.fullName || ""} ${contact.username || ""}`.toLowerCase().includes(search.trim().toLowerCase())), [contacts, search]);

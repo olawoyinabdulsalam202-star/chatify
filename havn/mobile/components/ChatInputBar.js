@@ -1,7 +1,9 @@
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Icon from "./Icon";
 
-export default function ChatInputBar({ theme, value, onChangeText, onEmoji, onAttach, onCamera, onSend, onRecord, sending, disabled, recordingVoice, voiceRecorder }) {
+export default function ChatInputBar({ theme, value, onChangeText, onEmoji, onAttach, onCamera, onSend, onRecord, onOffline, offline = false, sending, disabled, recordingVoice, voiceRecorder }) {
+  const offlineAction = offline ? onOffline : null;
+  const action = offlineAction || (value.trim() ? onSend : onRecord);
   return <View style={styles.row}>
     {recordingVoice ? <View style={[styles.voiceWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>{voiceRecorder}</View> : <View style={[styles.pill, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="Emoji, stickers and GIFs" disabled={disabled} onPress={onEmoji} style={styles.innerButton}><Icon name="smile" color={theme.primary} size={22} /></Pressable>
@@ -9,7 +11,7 @@ export default function ChatInputBar({ theme, value, onChangeText, onEmoji, onAt
       <Pressable accessibilityRole="button" accessibilityLabel="Attach" disabled={disabled} onPress={onAttach} style={styles.innerButton}><Icon name="paperclip" color={theme.muted} size={22} /></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Take photo or video" disabled={disabled} onPress={onCamera} style={styles.innerButton}><Icon name="camera" color={theme.muted} size={21} /></Pressable>
     </View>}
-    {!recordingVoice && <Pressable accessibilityRole="button" accessibilityLabel={value.trim() ? "Send message" : "Record voice note"} disabled={sending || disabled} onPress={value.trim() ? onSend : onRecord} style={[styles.round, { backgroundColor: theme.primary, opacity: sending || disabled ? 0.5 : 1 }]}><Icon name={value.trim() ? "send" : "mic"} color="#FFFFFF" size={value.trim() ? 20 : 22} /></Pressable>}
+    {!recordingVoice && <Pressable accessibilityRole="button" accessibilityLabel={offline ? "No connection" : value.trim() ? "Send message" : "Record voice note"} disabled={sending || disabled} onPress={action} style={[styles.round, { backgroundColor: theme.primary, opacity: sending || disabled || offline ? 0.5 : 1 }]}><Icon name={value.trim() ? "send" : "mic"} color="#FFFFFF" size={value.trim() ? 20 : 22} /></Pressable>}
   </View>;
 }
 

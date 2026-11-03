@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import AppScreen from "../components/AppScreen";
 import Avatar from "../components/Avatar";
 import ChatRow from "../components/ChatRow";
@@ -14,6 +14,7 @@ import { usePresenceStore } from "../stores/usePresenceStore";
 import GroupsScreen from "./GroupsScreen";
 import StatusScreen from "./StatusScreen";
 import AssistantFloatingButton from "../components/AssistantFloatingButton";
+import OfflineBar from "../components/OfflineBar";
 
 function SearchResult({ person, onMessage }) {
   const theme = useTheme();
@@ -27,6 +28,7 @@ function SearchResult({ person, onMessage }) {
 export default function ChatListScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const routeParams = useLocalSearchParams();
   const authUser = useAuthStore((state) => state.authUser);
   const chats = useChatStore((state) => state.chats);
   const isLoading = useChatStore((state) => state.isLoading);
@@ -48,6 +50,12 @@ export default function ChatListScreen() {
 
   useEffect(() => { loadChats(); }, [loadChats]);
   useEffect(() => {
+    if (routeParams.story || routeParams.statusAuthor) {
+      setTab("status");
+      setSearchOpen(false);
+    }
+  }, [routeParams.story, routeParams.statusAuthor]);
+  useEffect(() => {
     const timer = setTimeout(() => searchUsers(searchText), 280);
     return () => clearTimeout(timer);
   }, [searchText, searchUsers]);
@@ -62,12 +70,13 @@ export default function ChatListScreen() {
   const listData = [{ _id: "__assistant__", assistant: true }, ...safeChats];
 
   return <AppScreen edges={["top", "left", "right", "bottom"]}>
+    <OfflineBar />
     <View style={[styles.header, { borderBottomColor: theme.border }]}>
       <View style={styles.headingGroup}><Text allowFontScaling style={[styles.heading, { color: theme.text, fontFamily: theme.fontFamily, fontSize: 27 * theme.fontScale }]}>Havn</Text><Text allowFontScaling style={[styles.subtitle, { color: theme.muted, fontFamily: theme.fontFamily, fontSize: 12 * theme.fontScale }]}>Private conversations</Text></View>
       <Pressable accessibilityRole="button" accessibilityLabel={searchOpen ? "Close search" : "Search by username"} onPress={() => { setSearchOpen((value) => !value); setSearchText(""); }} style={[styles.headerButton, { backgroundColor: theme.surface }]}><Icon name={searchOpen ? "close" : "search"} color={theme.text} /></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={() => router.push("/settings")} style={[styles.avatarButton, { borderColor: theme.border }]}><Avatar uri={authUser?.profilePic} name={authUser?.fullName} size={40} /></Pressable>
     </View>
-    {tab === "groups" ? <View style={styles.tabContent}><GroupsScreen embedded /></View> : tab === "status" ? <View style={styles.tabContent}><StatusScreen embedded /></View> : <View style={styles.tabContent}>
+    {tab === "groups" ? <View style={styles.tabContent}><GroupsScreen embedded /></View> : tab === "status" ? <View style={styles.tabContent}><StatusScreen embedded initialStoryId={routeParams.story} initialAuthorId={routeParams.statusAuthor} /></View> : <View style={styles.tabContent}>
     {searchOpen && <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}><Icon name="search" color={theme.muted} size={19} /><TextInput allowFontScaling value={searchText} onChangeText={setSearchText} autoCapitalize="none" autoCorrect={false} placeholder="Search username" placeholderTextColor={theme.muted} style={[styles.searchInput, { color: theme.text, fontFamily: theme.fontFamily, fontSize: 16 * theme.fontScale }]} /></View>}
     {searching ? <FlatList
       data={safeSearchResults}

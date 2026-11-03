@@ -2,44 +2,85 @@ import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+import messaging from "@react-native-firebase/messaging";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "./api";
+
+const ENABLED_KEY = "havn.notificationsEnabled";
+const LAST_ATTEMPT_KEY = "havn.push.lastAttemptAt";
+const REFRESH_INTERVAL = 6 * 60 * 60 * 1000;
 
 export function isExpoGo() {
   return Constants.appOwnership === "expo" || Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 }
 
-export async function registerPushDevice() {
-  if (Platform.OS !== "android") return { ok: false, reason: "android-only" };
-  if (isExpoGo()) {
-    console.info("Native push registration skipped: Expo Go does not provide Android remote push tokens.");
-    return { ok: false, reason: "expo-go" };
-  }
-  if (!Device.isDevice) {
-    console.info("Native push registration skipped: this is not a physical device.");
-    return { ok: false, reason: "simulator" };
-  }
+function result(ok, reason, details = {}) {
+  console.info(`Native push registration: ${reason}`);
+  return { ok, reason, ...details };
+}
 
-  await Notifications.setNotificationChannelAsync("messages", {
-    name: "Messages",
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 250, 200, 250],
-    lightColor: "#C2410C",
+async function postToken(token) {
+  if (!token) return result(false, "no-fcm-token");
+  await api("/push/device", {
+    method: "POST",
+    body: { fcmToken: token, appVersion: Constants.expoConfig?.version || "1.0.0" },
   });
-  let permission = await Notifications.getPermissionsAsync();
-  if (permission.status !== "granted") permission = await Notifications.requestPermissionsAsync();
-  if (permission.status !== "granted") return { ok: false, reason: "permission-denied" };
+  await AsyncStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now())).catch(() => {});
+  return result(true, "registered");
+}
 
+export async function registerPushToken(token) {
   try {
-    const pushToken = await Notifications.getDevicePushTokenAsync();
-    if (pushToken.type !== "android" || !pushToken.data) return { ok: false, reason: "no-fcm-token" };
-    await api("/push/device", {
-      method: "POST",
-      body: { fcmToken: pushToken.data, appVersion: Constants.expoConfig?.version || "1.0.0" },
-    });
-    return { ok: true };
+    const enabled = await AsyncStorage.getItem(ENABLED_KEY).catch(() => null);
+    if (enabled === "false") return result(false, "disabled-by-user");
+    if (Platform.OS !== "android") return result(false, "android-only");
+    if (isExpoGo()) return result(false, "expo-go");
+    if (!Device.isDevice) return result(false, "simulator");
+    const permission = await Notifications.getPermissionsAsync();
+    if (permission.status !== "granted") return result(false, "permission-denied");
+    return await postToken(token);
   } catch (error) {
-    console.warn("Native push registration failed:", error.message);
-    return { ok: false, reason: "registration-failed", message: error.message };
+    return result(false, "registration-failed", { message: error.message });
+  }
+}
+
+export async function registerPushDevice({ force = false, requestPermission = true } = {}) {
+  try {
+    if (Platform.OS !== "android") return result(false, "android-only");
+    if (isExpoGo()) return result(false, "expo-go");
+    if (!Device.isDevice) return result(false, "simulator");
+    const enabled = await AsyncStorage.getItem(ENABLED_KEY).catch(() => null);
+    if (enabled === "false") return result(false, "disabled-by-user");
+
+    if (!force) {
+      const lastAttemptAt = Number(await AsyncStorage.getItem(LAST_ATTEMPT_KEY).catch(() => 0));
+      if (lastAttemptAt && Date.now() - lastAttemptAt < REFRESH_INTERVAL) return result(true, "recently-registered");
+    }
+
+    await AsyncStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now())).catch(() => {});
+
+    await Notifications.setNotificationChannelAsync("messages", {
+      name: "Messages",
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 200, 250],
+      lightColor: "#C2410C",
+    });
+    let permission = await Notifications.getPermissionsAsync();
+    if (permission.status !== "granted" && requestPermission) permission = await Notifications.requestPermissionsAsync();
+    if (permission.status !== "granted") return result(false, "permission-denied");
+    if (enabled === null) await AsyncStorage.setItem(ENABLED_KEY, "true").catch(() => {});
+
+    let token = "";
+    try { token = await messaging().getToken(); } catch {}
+    if (token) return await postToken(token);
+
+    try {
+      const fallback = await Notifications.getDevicePushTokenAsync();
+      if (fallback.type === "android" && fallback.data) return await postToken(fallback.data);
+    } catch {}
+    return result(false, "no-fcm-token");
+  } catch (error) {
+    return result(false, "registration-failed", { message: error.message });
   }
 }
 

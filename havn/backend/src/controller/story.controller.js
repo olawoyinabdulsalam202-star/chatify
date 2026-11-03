@@ -2,6 +2,39 @@ import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 import Story from "../modules/Story.js";
 import User from "../modules/User.js";
+import { sendPushToUser } from "../lib/push.js";
+
+async function notifyFriendsOfStory(story, author) {
+  try {
+    const owner = await User.findById(story.userId).select("friends").lean();
+    const recipients = [...new Set((owner?.friends || []).map(String))].filter((id) => id !== String(story.userId)).slice(0, 200);
+    for (let index = 0; index < recipients.length; index += 20) {
+      const batch = recipients.slice(index, index + 20);
+      await Promise.all(batch.map(async (recipientId) => {
+        try {
+          await sendPushToUser(recipientId, {
+            title: author.fullName,
+            body: "posted a new status",
+            kind: "status-new",
+            chatId: String(story._id),
+            storyId: String(story._id),
+            authorId: String(author._id),
+            senderId: String(author._id),
+            actorId: String(author._id),
+            senderName: author.fullName,
+            avatarUrl: author.profilePic || "",
+            tag: `status-new-${author._id}`,
+            url: `/?statusAuthor=${author._id}&story=${story._id}`,
+          });
+        } catch (error) {
+          console.error(`Status push failed for ${recipientId}:`, error.message);
+        }
+      }));
+    }
+  } catch (error) {
+    console.error("Status friend notification failed:", error.message);
+  }
+}
 
 export const createStory = async (req, res) => {
   try {
@@ -39,6 +72,7 @@ export const createStory = async (req, res) => {
 
     // Notify contacts who are online that a new story is up.
     io.emit("newStory", { userId, storyId: story._id });
+    notifyFriendsOfStory(story, req.user).catch((error) => console.error("Status push failed:", error.message));
 
     res.status(201).json(story);
   } catch (error) {
@@ -189,17 +223,39 @@ export const likeStory = async (req, res) => {
 
     const alreadyLiked = story.likes.some((like) => like.userId.equals(userId));
     let liked;
+    let added = false;
     if (alreadyLiked) {
       const result = await Story.updateOne({ _id: id, "likes.userId": userId }, { $pull: { likes: { userId } } });
       liked = result.modifiedCount === 0;
     } else {
       const result = await Story.updateOne({ _id: id, "likes.userId": { $ne: userId } }, { $addToSet: { likes: { userId, likedAt: new Date() } } });
       liked = result.modifiedCount === 1;
+      added = liked;
       if (liked) io.to(`user:${story.userId}`).emit("storyLiked", { storyId: id, likerId: String(userId) });
     }
     const updated = await Story.findById(id).select("likes");
     liked = updated.likes.some((like) => like.userId.equals(userId));
     const likeCount = new Set(updated.likes.map((like) => String(like.userId))).size;
+    if (added && liked) {
+      try {
+        await sendPushToUser(story.userId, {
+          title: req.user.fullName,
+          body: "liked your status",
+          kind: "status",
+          chatId: String(story._id),
+          storyId: String(story._id),
+          authorId: String(story.userId),
+          senderId: String(userId),
+          actorId: String(userId),
+          senderName: req.user.fullName,
+          avatarUrl: req.user.profilePic || "",
+          tag: `status-like-${story._id}-${userId}`,
+          url: `/?statusAuthor=${story.userId}&story=${story._id}`,
+        });
+      } catch (error) {
+        console.error("Status like push failed:", error.message);
+      }
+    }
     return res.status(200).json({ liked, likeCount });
   } catch (error) {
     console.log("Error in likeStory controller: ", error.message);

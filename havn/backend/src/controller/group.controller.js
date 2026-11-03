@@ -50,6 +50,26 @@ const sendInvites = async (group, fromUser, targetIds) => {
     }
   });
 
+  await Promise.all(invites.map(async (invite) => {
+    try {
+      await sendPushToUser(invite.to, {
+        title: group.name,
+        body: `${fromUser.fullName} invited you`,
+        kind: "group-added",
+        chatId: String(group._id),
+        groupId: String(group._id),
+        actorId: String(fromUser._id),
+        senderId: String(fromUser._id),
+        senderName: fromUser.fullName,
+        avatarUrl: fromUser.profilePic || "",
+        tag: `group-added-${group._id}`,
+        url: `/?group=${group._id}`,
+      });
+    } catch (error) {
+      console.error("Group invite push failed:", error.message);
+    }
+  }));
+
   return invites;
 };
 
@@ -274,7 +294,8 @@ export const respondToGroupInvite = async (req, res) => {
       return res.status(404).json({ message: "This group no longer exists." });
     }
 
-    if (!group.isMember(userId)) {
+    const joinedNow = !group.isMember(userId);
+    if (joinedNow) {
       group.members.push({ userId, role: "member" });
       await group.save();
     }
@@ -282,6 +303,30 @@ export const respondToGroupInvite = async (req, res) => {
 
     io.in(`user:${userId}`).socketsJoin(`group:${group._id}`);
     await emitGroupUpdate(group._id);
+
+    if (joinedNow) {
+      await Promise.all(group.members
+        .filter((member) => member.role === "admin" && String(member.userId) !== String(userId))
+        .map(async (member) => {
+          try {
+            await sendPushToUser(member.userId, {
+              title: group.name,
+              body: `${req.user.fullName} joined the group`,
+              kind: "group-added",
+              chatId: String(group._id),
+              groupId: String(group._id),
+              actorId: String(userId),
+              senderId: String(userId),
+              senderName: req.user.fullName,
+              avatarUrl: req.user.profilePic || "",
+              tag: `group-joined-${group._id}-${userId}`,
+              url: `/?group=${group._id}`,
+            });
+          } catch (error) {
+            console.error("Group join push failed:", error.message);
+          }
+        }));
+    }
 
     res.status(200).json(await groupForViewer(group._id, userId));
   } catch (error) {
@@ -649,10 +694,18 @@ export const sendGroupMessage = async (req, res) => {
       .map((m) => String(m.userId))
       .filter((uid) => uid !== String(senderId) && (!botId || uid !== String(botId)));
 
+    const memberUsers = await User.find({ _id: { $in: recipients } }).select("_id username").lean();
+    const mentioned = new Set(memberUsers.filter((member) => {
+      if (!member.username) return false;
+      const name = member.username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(^|\\s)@${name}(?![a-z0-9_.])`, "i").test(String(text || ""));
+    }).map((member) => String(member._id)));
+
     recipients.forEach((uid) => {
+      const isMentioned = mentioned.has(uid);
       sendPushToUser(uid, {
         title: group.name,
-        body: `${req.user.fullName}: ${previewText(newMessage)}`,
+        body: isMentioned ? `mentioned you: ${previewText(newMessage)}` : `${req.user.fullName}: ${previewText(newMessage)}`,
         // One tag per group collapses a burst of messages into a single
         // notification instead of stacking one per message.
         tag: `group-${groupId}`,
@@ -664,6 +717,8 @@ export const sendGroupMessage = async (req, res) => {
         groupId: String(groupId),
         chatId: String(groupId),
         kind: "group",
+        actorId: String(senderId),
+        ...(isMentioned ? { mentioned: "true" } : {}),
         // The sender's face, not the group icon — matches who actually sent
         // this particular message, the same as the DM notification.
         icon: req.user.profilePic || undefined,

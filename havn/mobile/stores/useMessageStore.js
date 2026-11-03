@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
 import { getSocket } from "../lib/socket";
+import { readCache, writeCache } from "../lib/cache";
 
 const markSeenTimers = new Map();
 const markSeenRequests = new Map();
@@ -10,6 +11,11 @@ const mergeById = (current, fresh) => {
   fresh.forEach((item) => map.set(String(item._id), { ...map.get(String(item._id)), ...item }));
   return [...map.values()].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 };
+
+function cacheMessages(get) {
+  const partnerId = get().openPartner?._id;
+  if (partnerId) writeCache(`messages.${partnerId}`, get().messages.slice(-200));
+}
 
 export const useMessageStore = create((set, get) => ({
   openPartner: null,
@@ -21,10 +27,13 @@ export const useMessageStore = create((set, get) => ({
   replyTarget: null,
   error: "",
   openChat: async (partner) => {
-    const same = String(get().openPartner?._id) === String(partner._id);
-    set({ openPartner: partner, messages: same ? get().messages : [], visibleCount: 30, isTyping: false, replyTarget: null, error: "" });
-    if (!same) await get().loadMessages(partner._id);
-    else await get().loadMessages(partner._id, { quiet: true });
+    const id = String(partner._id);
+    const same = String(get().openPartner?._id) === id;
+    const cached = same ? get().messages : await readCache(`messages.${id}`);
+    const hasCached = Array.isArray(cached);
+    set({ openPartner: partner, messages: same ? get().messages : hasCached ? cached : [], visibleCount: 30, isTyping: false, replyTarget: null, error: "", isLoading: !same && !hasCached });
+    if (hasCached || same) get().loadMessages(id, { quiet: true });
+    else await get().loadMessages(id);
     get().markSeen(partner._id);
   },
   closeChat: () => {
@@ -40,12 +49,15 @@ export const useMessageStore = create((set, get) => ({
     if (!quiet) set({ isLoading: true, error: "" });
     try {
       const fresh = await api(`/messages/${partnerId}`);
+      if (String(get().openPartner?._id) !== String(partnerId)) return;
       const messages = [...fresh].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      set({ messages: quiet ? mergeById(get().messages, messages) : messages, visibleCount: Math.max(30, get().visibleCount) });
+      const next = (quiet ? mergeById(get().messages, messages) : messages).slice(-200);
+      set({ messages: next, visibleCount: Math.max(30, get().visibleCount) });
+      cacheMessages(get);
     } catch (error) {
-      if (!quiet) set({ error: error.message });
+      if (!quiet && error.status && String(get().openPartner?._id) === String(partnerId)) set({ error: error.message });
     } finally {
-      if (!quiet) set({ isLoading: false });
+      if (!quiet && String(get().openPartner?._id) === String(partnerId)) set({ isLoading: false });
     }
   },
   syncOpenChat: () => {
@@ -78,6 +90,7 @@ export const useMessageStore = create((set, get) => ({
         await request;
         marked = true;
         set({ messages: get().messages.map((message) => pendingIds.has(String(message._id)) ? { ...message, status: "seen" } : message) });
+        cacheMessages(get);
       } catch {
       } finally {
         markSeenRequests.delete(key);
@@ -104,17 +117,20 @@ export const useMessageStore = create((set, get) => ({
       isOptimistic: true,
     };
     set({ messages: [...get().messages, optimistic], replyTarget: null });
+    cacheMessages(get);
     try {
       const result = await api(`/messages/send/${partner._id}`, {
         method: "POST",
         body: { ...payload, replyToId: optimistic.replyTo?.messageId },
       });
       set({ messages: mergeById(get().messages.filter((item) => item._id !== tempId), [result]) });
+      cacheMessages(get);
       const chatStore = (await import("./useChatStore")).useChatStore;
       chatStore.getState().updateFromMessage(result, auth.authUser?._id, true);
       return result;
     } catch (error) {
       set({ messages: get().messages.filter((item) => item._id !== tempId), error: error.message });
+      cacheMessages(get);
       throw error;
     } finally {
       set({ isSending: false });
@@ -126,13 +142,14 @@ export const useMessageStore = create((set, get) => ({
     const belongs = String(message.senderId) === partnerId || String(message.receiverId) === partnerId;
     if (!belongs) return false;
     set({ messages: mergeById(get().messages, [message]) });
+    cacheMessages(get);
     if (String(message.senderId) === partnerId) get().markSeen(partnerId);
     return true;
   },
-  applyDelivered: (messageId) => set({ messages: get().messages.map((message) => String(message._id) === String(messageId) ? { ...message, status: "delivered" } : message) }),
-  applySeen: (senderId) => set({ messages: get().messages.map((message) => String(message.receiverId) === String(senderId) ? { ...message, status: "seen" } : message) }),
-  applyEdited: (updated) => set({ messages: get().messages.map((message) => String(message._id) === String(updated._id) ? { ...message, ...updated } : message) }),
-  applyDeleted: (updated) => set({ messages: get().messages.map((message) => String(message._id) === String(updated._id) ? { ...message, ...updated } : message) }),
+  applyDelivered: (messageId) => { set({ messages: get().messages.map((message) => String(message._id) === String(messageId) ? { ...message, status: "delivered" } : message) }); cacheMessages(get); },
+  applySeen: (senderId) => { set({ messages: get().messages.map((message) => String(message.receiverId) === String(senderId) ? { ...message, status: "seen" } : message) }); cacheMessages(get); },
+  applyEdited: (updated) => { set({ messages: get().messages.map((message) => String(message._id) === String(updated._id) ? { ...message, ...updated } : message) }); cacheMessages(get); },
+  applyDeleted: (updated) => { set({ messages: get().messages.map((message) => String(message._id) === String(updated._id) ? { ...message, ...updated } : message) }); cacheMessages(get); },
   setReplyTarget: (message) => set({ replyTarget: message }),
   emitTyping: () => {
     const receiverId = get().openPartner?._id;

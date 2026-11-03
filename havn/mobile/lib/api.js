@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 import Constants from "expo-constants";
+import { setOffline } from "./networkStore";
 
 const API_ORIGIN = (process.env.EXPO_PUBLIC_API_URL || "https://api.kairos-va.com").replace(/\/+$/, "");
 const API_BASE = API_ORIGIN.endsWith("/api") ? API_ORIGIN : `${API_ORIGIN}/api`;
@@ -63,6 +64,7 @@ export async function api(path, options = {}) {
         : options.body,
       signal: controller.signal,
     });
+    setOffline(false);
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 401 && token && !options.keepSessionOn401) {
@@ -76,8 +78,14 @@ export async function api(path, options = {}) {
     }
     return data;
   } catch (error) {
-    if (error.name === "AbortError") throw new Error("The request timed out. Check your connection and try again.");
-    if (error instanceof TypeError) throw new Error("Could not reach Havn. Check your internet connection.");
+    if (error.name === "AbortError") {
+      setOffline(true);
+      throw new Error("The request timed out. Check your connection and try again.");
+    }
+    if (error instanceof TypeError) {
+      setOffline(true);
+      throw new Error("Could not reach Havn. Check your internet connection.");
+    }
     throw error;
   } finally {
     clearTimeout(timer);

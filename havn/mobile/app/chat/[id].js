@@ -35,6 +35,11 @@ import { useCallStore } from "../../stores/useCallStore";
 import MarqueeText from "../../components/MarqueeText";
 import AppSheet from "../../components/AppSheet";
 import { useBlockedStore } from "../../stores/useBlockedStore";
+import OfflineBar from "../../components/OfflineBar";
+import { useNetworkStore } from "../../lib/networkStore";
+import { showToast } from "../../lib/toast";
+import { clearChatNotifications } from "../../lib/callNotifications";
+import { clearActiveNotificationContext, setActiveNotificationContext } from "../../lib/notificationState";
 
 function dayLabel(value) {
   const date = new Date(value);
@@ -45,6 +50,7 @@ export default function DirectChatScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const isOffline = useNetworkStore((state) => state.isOffline);
   const { id } = useLocalSearchParams();
   const partnerId = String(id || "");
   const { width } = useWindowDimensions();
@@ -55,7 +61,8 @@ export default function DirectChatScreen() {
   const openedPartnerIdRef = useRef(null);
   const authUser = useAuthStore((state) => state.authUser);
   const chats = useChatStore((state) => state.chats);
-  const partner = chats.find((item) => String(item._id) === partnerId);
+  const openPartner = useMessageStore((state) => state.openPartner);
+  const partner = chats.find((item) => String(item._id) === partnerId) || (String(openPartner?._id) === partnerId ? openPartner : null);
   const partnerKnown = Boolean(partner);
   const onlineUsers = usePresenceStore((state) => state.onlineUsers);
   const messages = useMessageStore((state) => state.messages);
@@ -117,6 +124,8 @@ export default function DirectChatScreen() {
   }, [partnerId, partnerKnown]);
 
   useFocusEffect(useCallback(() => {
+    setActiveNotificationContext({ kind: "dm", id: partnerId });
+    clearChatNotifications(partnerId);
     const focusedPartner = useChatStore.getState().chats.find((item) => String(item._id) === partnerId);
     if (focusedPartner) {
       if (String(useMessageStore.getState().openPartner?._id) !== partnerId) {
@@ -127,6 +136,7 @@ export default function DirectChatScreen() {
       useChatStore.getState().clearUnread(partnerId);
     }
     return () => {
+      clearActiveNotificationContext("dm", partnerId);
       clearTimeout(typingTimer.current);
       useMessageStore.getState().emitStopTyping();
       if (String(useMessageStore.getState().openPartner?._id) === partnerId) {
@@ -153,6 +163,7 @@ export default function DirectChatScreen() {
   const sendText = async () => {
     const text = draft.trim();
     if (!text || isSending || mediaBusy || blocked) return;
+    if (isOffline) { showToast("No connection", "info"); return; }
     setDraft("");
     clearTimeout(typingTimer.current);
     useMessageStore.getState().emitStopTyping();
@@ -322,6 +333,7 @@ export default function DirectChatScreen() {
         <Pressable accessibilityRole="button" accessibilityLabel="Video call" onPress={() => beginCall("video")} style={styles.callIconButton}><Icon name="video" color={theme.text} size={24} strokeWidth={2} /></Pressable></>}
         <Pressable accessibilityRole="button" accessibilityLabel="Conversation menu" onPress={showChatMenu} style={styles.back}><Icon name="more" color={theme.text} /></Pressable>
       </View>
+      <OfflineBar />
       {searchOpen && <View style={[styles.searchBar, { backgroundColor: theme.surface, borderColor: theme.border }]}><TextInput value={searchQuery} onChangeText={setSearchQuery} onSubmitEditing={() => searchInChat()} returnKeyType="search" placeholder="Search in chat" placeholderTextColor={theme.muted} style={[styles.searchInput, { color: theme.text }]} /><Pressable onPress={() => searchInChat()}><Icon name="search" color={theme.primary} size={19} /></Pressable><Text style={{ color: theme.muted, minWidth: 36, textAlign: "center" }}>{searchMatches.length ? `${searchIndex + 1}/${searchMatches.length}` : "0/0"}</Text><Pressable accessibilityLabel="Previous match" onPress={() => moveSearch(-1)}><Icon name="back" color={theme.text} size={18} /></Pressable><Pressable accessibilityLabel="Next match" onPress={() => moveSearch(1)}><Icon name="chevron" color={theme.text} size={18} /></Pressable><Pressable onPress={() => { setSearchOpen(false); setSearchQuery(""); setSearchMatches([]); }}><Icon name="close" color={theme.muted} size={18} /></Pressable></View>}
       {isLoading && messages.length === 0 ? <LoadingView label="Loading messages" /> : error && messages.length === 0 ? <View style={styles.errorWrap}><Text allowFontScaling style={[styles.errorText, { color: theme.danger }]}>{error}</Text><Pressable onPress={() => useMessageStore.getState().loadMessages(partnerId)}><Text style={{ color: theme.primary, padding: 12 }}>Try again</Text></Pressable></View> : <FlatList
         ref={listRef}
@@ -342,7 +354,7 @@ export default function DirectChatScreen() {
       {!!error && messages.length > 0 && <Text allowFontScaling style={[styles.sendError, { color: theme.danger }]}>{error}</Text>}
       {replyTarget && <View style={[styles.replyPreview, { backgroundColor: theme.surface, borderColor: theme.border }]}><View style={[styles.replyLine, { backgroundColor: theme.primary }]} /><View style={styles.replyCopy}><Text style={{ color: theme.primary, fontSize: 12, fontWeight: "700" }}>Replying to message</Text><Text numberOfLines={1} style={{ color: theme.text, fontSize: 13 }}>{replyTarget.text || (replyTarget.image ? "Photo" : "Message")}</Text></View><Pressable accessibilityLabel="Cancel reply" onPress={() => useMessageStore.getState().setReplyTarget(null)} style={styles.closeReply}><Icon name="close" color={theme.muted} size={19} /></Pressable></View>}
       <View style={[styles.composer, { backgroundColor: theme.background, borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, 8) }]}>
-        <ChatInputBar theme={theme} value={draft} onChangeText={onDraftChange} onEmoji={() => setPickerOpen(true)} onAttach={() => setAttachOpen(true)} onCamera={() => chooseMedia("camera")} onSend={sendText} onRecord={() => setRecordingVoice(true)} sending={isSending || mediaBusy} disabled={blocked} recordingVoice={recordingVoice} voiceRecorder={<VoiceRecorder theme={theme} onSend={sendVoice} onCancel={() => setRecordingVoice(false)} />} />
+        <ChatInputBar theme={theme} value={draft} onChangeText={onDraftChange} onEmoji={() => setPickerOpen(true)} onAttach={() => setAttachOpen(true)} onCamera={() => chooseMedia("camera")} onSend={sendText} onRecord={() => setRecordingVoice(true)} onOffline={() => showToast("No connection", "info")} offline={isOffline} sending={isSending || mediaBusy} disabled={blocked} recordingVoice={recordingVoice} voiceRecorder={<VoiceRecorder theme={theme} onSend={sendVoice} onCancel={() => setRecordingVoice(false)} />} />
       </View>
       {mediaBusy && <View style={{ height: 3, backgroundColor: theme.border }}><View style={{ height: 3, width: Math.max(4, Math.round(uploadProgress * 100)) + "%", backgroundColor: theme.primary }} /></View>}
     </KeyboardAvoidingView>

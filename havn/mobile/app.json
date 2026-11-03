@@ -39,7 +39,6 @@
       "expo-web-browser",
       "expo-font",
       "@react-native-firebase/app",
-      "@notifee/react-native",
       "@config-plugins/react-native-webrtc",
       ["expo-build-properties", { "android": { "minSdkVersion": 24 } }]
     ],

@@ -337,7 +337,7 @@ export const sendMessage = async (req, res) => {
     // a socket means "actually looking at it".
     sendPushToUser(receiverId, {
       title: req.user.fullName,
-      body: storyReply ? `Replied to your status: ${text}` : previewText(newMessage),
+      body: storyReply ? `replied to your status: ${text}` : previewText(newMessage),
       tag: `dm-${senderId}`,
       url: `/?dm=${senderId}`,
       messageId: String(newMessage._id),
@@ -345,7 +345,9 @@ export const sendMessage = async (req, res) => {
       senderName: req.user.fullName,
       avatarUrl: req.user.profilePic || "",
       chatId: String(senderId),
-      kind: "dm",
+      kind: storyReply ? "status-reply" : "dm",
+      actorId: String(senderId),
+      ...(storyReply ? { storyId: String(storyReply.storyId) } : {}),
       // Shown as the notification's icon so it reads like a real message from
       // a person (Telegram-style) instead of a generic app notification.
       icon: req.user.profilePic || undefined,
@@ -563,6 +565,7 @@ export const toggleReaction = async (req, res) => {
     if (!message) return res.status(404).json({ message: "Message not found." });
 
     const existingIndex = message.reactions.findIndex((r) => r.userId.equals(userId));
+    let shouldNotify = false;
 
     if (existingIndex !== -1 && message.reactions[existingIndex].emoji === emoji) {
       // tapping the same emoji again removes it
@@ -570,8 +573,10 @@ export const toggleReaction = async (req, res) => {
     } else if (existingIndex !== -1) {
       // switch to a different emoji
       message.reactions[existingIndex].emoji = emoji;
+      shouldNotify = true;
     } else {
       message.reactions.push({ userId, emoji });
+      shouldNotify = true;
     }
 
     await message.save();
@@ -584,6 +589,28 @@ export const toggleReaction = async (req, res) => {
       const otherSocketId = getReceiverSocketId(otherUserId);
       if (otherSocketId) {
         io.to(otherSocketId).emit("messageReaction", message);
+      }
+    }
+
+    const ownerId = String(message.senderId?._id || message.senderId);
+    if (shouldNotify && ownerId !== String(userId)) {
+      const groupId = message.groupId ? String(message.groupId) : "";
+      const chatId = groupId || String(message.receiverId);
+      try {
+        await sendPushToUser(ownerId, {
+          title: req.user.fullName,
+          body: `reacted ${emoji} to your message`,
+          kind: "reaction",
+          chatId,
+          ...(groupId ? { groupId, targetType: "group", url: `/?group=${groupId}` } : { url: `/?dm=${chatId}` }),
+          actorId: String(userId),
+          senderId: String(userId),
+          senderName: req.user.fullName,
+          avatarUrl: req.user.profilePic || "",
+          tag: `reaction-${message._id}`,
+        });
+      } catch (error) {
+        console.error("Reaction push failed:", error.message);
       }
     }
 

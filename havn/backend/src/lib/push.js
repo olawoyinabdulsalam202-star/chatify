@@ -1,6 +1,7 @@
 import { ENV } from "./env.js";
 import PushSubscription from "../modules/PushSubscription.js";
 import PushDevice from "../modules/PushDevice.js";
+import User from "../modules/User.js";
 
 // Web Push delivers a notification to a device even when the app is closed —
 // that's the whole point of it over a socket event, which only works while a tab
@@ -99,6 +100,7 @@ export async function sendPushToUser(userId, payload) {
   // A message can arrive immediately after boot, before the dynamic web-push
   // import in server.js has completed. Wait once here instead of dropping that
   // first notification.
+  try {
   if (!configured) await initPush();
   if (!userId) {
     // Silence here was the problem: a missing package, missing keys, or a
@@ -109,7 +111,34 @@ export async function sendPushToUser(userId, payload) {
     return { sent: 0, skipped: reason };
   }
 
-  try {
+    const kind = payload.kind || "dm";
+    const prefKey = ({ dm: "messages", "status-reply": "messages", group: "groups", "group-added": "groups", status: "status", "status-new": "status", friend: "friends", reaction: "reactions" })[kind];
+    const actorId = payload.actorId || payload.senderId || payload.callerId || payload.likerId || payload.reactorId;
+    const [recipient, actor] = await Promise.all([
+      User.findById(userId).select("notificationPrefs blockedUsers").lean(),
+      actorId ? User.findById(actorId).select("blockedUsers").lean() : null,
+    ]);
+    if (!recipient) {
+      const reason = "recipient does not exist";
+      console.log(`Push skipped for ${userId}: ${reason}`);
+      return { sent: 0, skipped: reason };
+    }
+    if (prefKey && recipient.notificationPrefs?.[prefKey] === false) {
+      const reason = `${prefKey} notifications are disabled`;
+      console.log(`Push skipped for ${userId}: ${reason}`);
+      return { sent: 0, skipped: reason };
+    }
+    if (actorId && String(actorId) === String(userId)) {
+      const reason = "recipient caused the event";
+      console.log(`Push skipped for ${userId}: ${reason}`);
+      return { sent: 0, skipped: reason };
+    }
+    if (actorId && (recipient.blockedUsers?.some((id) => String(id) === String(actorId)) || actor?.blockedUsers?.some((id) => String(id) === String(userId)))) {
+      const reason = "actor and recipient have blocked each other";
+      console.log(`Push skipped for ${userId}: ${reason}`);
+      return { sent: 0, skipped: reason };
+    }
+
     let sent = 0;
     let pruned = 0;
     let failed = 0;
@@ -117,7 +146,18 @@ export async function sendPushToUser(userId, payload) {
     const nativeCallSignal = payload.kind === "call" || payload.kind === "callCancelled";
     if (configured && webpush && !nativeCallSignal) {
       subs = await PushSubscription.find({ userId });
-      const body = JSON.stringify(payload);
+      const normalized = {
+        ...payload,
+        kind,
+        chatId: payload.chatId || payload.groupId || payload.senderId || "",
+        avatarUrl: payload.avatarUrl || payload.icon || "",
+        senderName: payload.senderName || payload.title || "Havn",
+        body: payload.body || "New notification",
+        tag: payload.tag || `havn-${kind}`,
+        url: payload.url || destinationFor(kind, payload),
+        channelId: channelForKind(kind),
+      };
+      const body = JSON.stringify(normalized);
       await Promise.all(subs.map(async (sub) => {
         try {
           await webpush.sendNotification(
@@ -165,15 +205,24 @@ export async function sendPushToUser(userId, payload) {
     if (admin && devices.length) {
       const sender = payload.senderName || payload.title || "Havn";
       const data = Object.fromEntries(Object.entries({
+        title: payload.title || payload.senderName || "Havn",
         senderName: sender,
         avatarUrl: payload.avatarUrl || payload.icon || "",
         body: payload.body || "New message",
         chatId: payload.chatId || payload.groupId || payload.senderId || "",
+        messageId: payload.messageId || "",
         kind: payload.kind || "dm",
         tag: payload.tag || "havn-message",
         callId: payload.callId || "",
         callerId: payload.callerId || payload.senderId || "",
         callType: payload.callType || "",
+        url: payload.url || destinationFor(kind, payload),
+        storyId: payload.storyId || "",
+        authorId: payload.authorId || "",
+        groupId: payload.groupId || "",
+        targetType: payload.targetType || "",
+        actorId: payload.actorId || "",
+        channelId: channelForKind(kind),
       }).map(([key, value]) => [key, String(value)]));
       const call = payload.kind === "call" || payload.kind === "callCancelled";
       await Promise.all(devices.map(async (device) => {
@@ -208,6 +257,21 @@ export async function sendPushToUser(userId, payload) {
     console.log("sendPushToUser error:", error.message);
     return { sent: 0, failed: 1, error: error.message };
   }
+}
+
+function destinationFor(kind, payload) {
+  if (kind === "status" || kind === "status-new") return `/?statusAuthor=${encodeURIComponent(payload.authorId || payload.senderId || "")}&story=${encodeURIComponent(payload.storyId || payload.chatId || "")}`;
+  if (kind === "friend") return `/?dm=${encodeURIComponent(payload.chatId || payload.actorId || "")}`;
+  if (kind === "group" || kind === "group-added" || (kind === "reaction" && payload.groupId)) return `/?group=${encodeURIComponent(payload.groupId || payload.chatId || "")}`;
+  if (kind === "call" || kind === "callCancelled") return "/call";
+  return `/?dm=${encodeURIComponent(payload.chatId || payload.senderId || "")}`;
+}
+
+function channelForKind(kind) {
+  if (["status", "status-new"].includes(kind)) return "status";
+  if (["friend", "reaction"].includes(kind)) return "social";
+  if (["call", "callCancelled"].includes(kind)) return "calls";
+  return "messages";
 }
 
 // Truncates message text for a notification body. Long messages get cut so the

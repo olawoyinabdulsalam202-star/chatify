@@ -6,18 +6,25 @@ import { usePresenceStore } from "../stores/usePresenceStore";
 import { useGroupStore } from "../stores/useGroupStore";
 import { useStoryStore } from "../stores/useStoryStore";
 import { useCallStore } from "../stores/useCallStore";
-import {  } from "react-native";
+import { router } from "expo-router";
+import { setOffline } from "./networkStore";
 
 const boundSockets = new WeakSet();
+const presenceRefreshTimers = new Map();
 
 export function bindSocketEvents(socket) {
   if (!socket || boundSockets.has(socket)) return;
   boundSockets.add(socket);
 
   socket.on("connect", () => {
+    setOffline(false);
     useMessageStore.getState().syncOpenChat();
     useChatStore.getState().loadChats({ quiet: true });
+    useGroupStore.getState().load({ quiet: true });
+    useGroupStore.getState().syncOpenGroup();
   });
+  socket.on("disconnect", () => setOffline(true));
+  socket.on("connect_error", () => setOffline(true));
   socket.on("incomingCall", (payload) => useCallStore.getState().receiveCall(payload));
   socket.on("callStarted", ({ callId }) => useCallStore.setState({ callId }));
   socket.on("callAnswered", (payload) => useCallStore.getState().onAnswered(payload));
@@ -37,12 +44,57 @@ export function bindSocketEvents(socket) {
   socket.on("messageDeleted", (message) => { if (message.groupId) useGroupStore.getState().editMessage(message); });
   socket.on("groupUpdated", (group) => useGroupStore.setState((state) => ({ groups: state.groups.map((item) => String(item._id) === String(group._id) ? group : item) })));
   socket.on("groupCreated", (group) => useGroupStore.setState((state) => ({ groups: state.groups.some((item) => String(item._id) === String(group._id)) ? state.groups : [group, ...state.groups] })));
-  socket.on("groupDeleted", ({ groupId }) => useGroupStore.setState((state) => ({ groups: state.groups.filter((item) => String(item._id) !== String(groupId)) })));
+  socket.on("groupDeleted", ({ groupId }) => {
+    const store = useGroupStore.getState();
+    const wasSelected = String(store.selectedId) === String(groupId);
+    store.removeGroup(groupId);
+    if (wasSelected) {
+      useGroupStore.getState().close();
+      if (router.canGoBack()) router.back();
+      else router.replace("/");
+    }
+  });
   socket.on("newStory", () => useStoryStore.getState().load());
   socket.on("storyDeleted", ({ storyId }) => useStoryStore.setState((state) => ({ mine: state.mine.filter((item) => String(item._id) !== String(storyId)), feed: state.feed.map((group) => ({ ...group, stories: group.stories.filter((item) => String(item._id) !== String(storyId)) })).filter((group) => group.stories.length) })));
   socket.on("storyViewed", ({ storyId, viewerId }) => useStoryStore.setState((state) => ({ mine: state.mine.map((story) => String(story._id) !== String(storyId) || story.viewers?.some((item) => String(item.userId?._id || item.userId) === String(viewerId)) ? story : { ...story, viewers: [...(story.viewers || []), { userId: viewerId, viewedAt: new Date().toISOString() }] }) })));
   socket.on("storyLiked", ({ storyId, likerId }) => useStoryStore.setState((state) => ({ mine: state.mine.map((story) => String(story._id) !== String(storyId) || story.likes?.some((item) => String(item.userId?._id || item.userId) === String(likerId)) ? story : { ...story, likes: [...(story.likes || []), { userId: likerId, likedAt: new Date().toISOString() }] }) })));
-  socket.on("presenceUpdate", ({ userId, online }) => usePresenceStore.getState().setPresence(userId, online));
+  socket.on("presenceUpdate", ({ userId, online }) => {
+    const id = String(userId);
+    usePresenceStore.getState().setPresence(id, online);
+    if (online) return;
+
+    const lastSeenAt = new Date().toISOString();
+    const hasVisibleLastSeen = (person) => person?.lastSeenAt != null;
+    useChatStore.setState((state) => ({
+      chats: state.chats.map((person) => String(person._id) === id && hasVisibleLastSeen(person)
+        ? { ...person, lastSeenAt }
+        : person),
+    }));
+    useMessageStore.setState((state) => ({
+      openPartner: String(state.openPartner?._id) === id && hasVisibleLastSeen(state.openPartner)
+        ? { ...state.openPartner, lastSeenAt }
+        : state.openPartner,
+    }));
+    useGroupStore.setState((state) => ({
+      groups: state.groups.map((group) => {
+        let changed = false;
+        const members = (group.members || []).map((member) => {
+          const person = member.userId;
+          if (String(person?._id || person) !== id || !hasVisibleLastSeen(person)) return member;
+          changed = true;
+          return { ...member, userId: { ...person, lastSeenAt } };
+        });
+        return changed ? { ...group, members } : group;
+      }),
+    }));
+
+    const previous = presenceRefreshTimers.get(id);
+    if (previous) clearTimeout(previous);
+    presenceRefreshTimers.set(id, setTimeout(() => {
+      presenceRefreshTimers.delete(id);
+      useChatStore.getState().loadChats({ quiet: true });
+    }, 1500));
+  });
   socket.on("newMessage", (message) => {
     if (!message?.receiverId) return;
     const currentUserId = useAuthStore.getState().authUser?._id;
