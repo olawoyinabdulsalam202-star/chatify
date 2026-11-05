@@ -576,7 +576,7 @@ function SettingsPage() {
         </button>
       )}
       <p className="mt-3 text-xs text-slate-500">
-        For notifications that show as Havn, install the app from your browser menu (Install app).
+        For notifications that show as Havn instead of Chrome, install Havn from your browser menu (Install app).
       </p>
     </div>
   );

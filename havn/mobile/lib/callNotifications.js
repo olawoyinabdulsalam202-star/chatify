@@ -5,8 +5,9 @@ import * as Notifications from "expo-notifications";
 import { isNotificationTargetOpen } from "./notificationState";
 import { push as navigate, queueForLogin } from "./navigation";
 
-const CALL_CHANNEL = "calls";
+const CALL_CHANNEL = "incoming-calls";
 const handledNotificationIds = new Set();
+let channelInitialization;
 export const nativeMessagingReady = Constants.appOwnership !== "expo" && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 function notificationId(data, id) {
@@ -71,20 +72,27 @@ export async function consumeInitialNotification() {
   }
 }
 
-async function createNotificationChannels() {
-  await notifee.deleteChannel("messages").catch(() => {});
-  await Promise.all([
-    notifee.createChannel({ id: "messages-v2", name: "Messages", importance: AndroidImportance.HIGH, sound: "default", vibration: true, vibrationPattern: [0, 250, 200, 250], lights: true, lightColor: "#C2410C", visibility: AndroidVisibility.PRIVATE }),
-    notifee.createChannel({ id: "status", name: "Status", importance: AndroidImportance.DEFAULT, sound: "default", vibration: true, lights: true, lightColor: "#C2410C", visibility: AndroidVisibility.PRIVATE }),
-    notifee.createChannel({ id: "social", name: "Friends and reactions", importance: AndroidImportance.DEFAULT, sound: "default", vibration: true, lights: true, lightColor: "#C2410C", visibility: AndroidVisibility.PRIVATE }),
-    notifee.createChannel({ id: CALL_CHANNEL, name: "Calls", importance: AndroidImportance.HIGH, sound: "default", vibration: true }),
-  ]);
+export function initNotificationChannels() {
+  if (!nativeMessagingReady) return Promise.resolve();
+  if (!channelInitialization) {
+    channelInitialization = (async () => {
+      await notifee.deleteChannel("messages").catch(() => {});
+      await Promise.all([
+        notifee.createChannel({ id: "messages-v2", name: "Messages", importance: AndroidImportance.HIGH, sound: "default", vibration: true, vibrationPattern: [0, 250, 200, 250], lights: true, lightColor: "#C2410C", visibility: AndroidVisibility.PRIVATE }),
+        notifee.createChannel({ id: "status", name: "Status", importance: AndroidImportance.DEFAULT, sound: "default", vibration: true, lights: true, lightColor: "#C2410C", visibility: AndroidVisibility.PRIVATE }),
+        notifee.createChannel({ id: "social", name: "Friends and reactions", importance: AndroidImportance.DEFAULT, sound: "default", vibration: true, lights: true, lightColor: "#C2410C", visibility: AndroidVisibility.PRIVATE }),
+        notifee.createChannel({ id: CALL_CHANNEL, name: "Incoming calls", importance: AndroidImportance.HIGH, sound: "default", vibration: true, vibrationPattern: [0, 900, 500, 900] }),
+        notifee.createChannel({ id: "connection", name: "Connection", importance: AndroidImportance.LOW, sound: null, vibration: false, badge: false }),
+      ]);
+    })();
+  }
+  return channelInitialization;
 }
 
-if (nativeMessagingReady) createNotificationChannels().catch((error) => console.warn("Notification channels could not be created:", error.message));
+if (nativeMessagingReady) initNotificationChannels().catch((error) => console.warn("Notification channels could not be created:", error.message));
 
 async function showIncomingCall(data = {}) {
-  await notifee.createChannel({ id: CALL_CHANNEL, name: "Incoming calls", importance: AndroidImportance.HIGH, sound: "default", vibration: true, vibrationPattern: [0, 900, 500, 900] });
+  await initNotificationChannels();
   await notifee.displayNotification({
     id: `call-${data.callId || "incoming"}`,
     title: data.senderName || "Incoming call",
@@ -119,7 +127,7 @@ function notificationChannel(kind) {
 }
 
 async function showMessage(data = {}) {
-  await createNotificationChannels();
+  await initNotificationChannels();
   const groupChatId = data.groupId || (data.kind === "group" ? data.chatId : "");
   const groupId = groupChatId ? `havn-group-${groupChatId}` : undefined;
   const id = data.kind === "group" ? `group-message-${data.messageId || Date.now()}` : data.tag || `notification-${data.chatId || Date.now()}`;
@@ -128,7 +136,7 @@ async function showMessage(data = {}) {
     title: data.title || data.senderName || "Havn",
     body: data.body || "New message",
     data,
-    android: { channelId: notificationChannel(data.kind), smallIcon: "notification_icon", color: "#C2410C", importance: notificationChannel(data.kind) === "messages" ? AndroidImportance.HIGH : AndroidImportance.DEFAULT, pressAction: { id: "default", launchActivity: "default" }, largeIcon: data.avatarUrl || undefined, ...(groupId ? { groupId, groupAlertBehavior: AndroidGroupAlertBehavior.SUMMARY } : {}) },
+    android: { channelId: notificationChannel(data.kind), smallIcon: "notification_icon", color: "#C2410C", importance: notificationChannel(data.kind) === "messages-v2" ? AndroidImportance.HIGH : AndroidImportance.DEFAULT, pressAction: { id: "default", launchActivity: "default" }, largeIcon: data.avatarUrl || undefined, ...(groupId ? { groupId, groupAlertBehavior: AndroidGroupAlertBehavior.SUMMARY } : {}) },
   });
   if (groupId) {
     const displayed = await notifee.getDisplayedNotifications();

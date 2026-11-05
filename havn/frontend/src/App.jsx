@@ -301,7 +301,7 @@ function App() {
           socket event fired with nothing rendered to answer it — the call was
           simply invisible and silent on that page. */}
       {authUser && callState === "ringing" && <IncomingCallModal />}
-      {authUser && (callState === "calling" || callState === "active") && <CallScreen />}
+      {authUser && ["calling", "ringing-offline", "noAnswer", "active"].includes(callState) && <CallScreen />}
 
       {/* Outside the auth check: someone stuck on an old build may be sitting on
           the login screen, and that's exactly who needs the offer most. */}

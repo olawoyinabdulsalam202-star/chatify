@@ -22,7 +22,7 @@ import AssistantListRow from "../components/AssistantListRow";
 import AssistantChat from "../components/AssistantChat";
 import { useAssistantStore } from "../store/useAssistantStore";
 import { useSidebarWidth } from "../hooks/useSidebarWidth";
-import AppDownloadNote from "../components/AppDownloadNote";
+import AppInstallBanner from "../components/AppInstallBanner";
 
 function ChatPage() {
   const { width: sidebarWidth, maxWidth: sidebarMaxWidth, setWidth, persistWidth, clampWidth } = useSidebarWidth();
@@ -175,18 +175,19 @@ function ChatPage() {
   // The app-height variable follows the visible viewport as browser chrome or
   // the soft keyboard changes the available height.
   return (
-    <div className="relative w-full max-w-6xl md:max-w-none min-h-0 h-[var(--app-h,100dvh)] max-h-none md:h-full md:max-h-[920px]">
-      <Panel
-        className="rounded-none border-0 md:rounded-2xl md:border md:grid md:grid-cols-[var(--sidebar-w)_6px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]"
-        style={{ "--sidebar-w": `${sidebarWidth}px` }}
-      >
+    <div className="relative flex w-full max-w-6xl min-h-0 h-[var(--app-h,100dvh)] max-h-none flex-col md:max-w-none md:h-full md:max-h-[920px]">
+      <AppInstallBanner />
+      <div className="min-h-0 flex-1">
+        <Panel
+          className="rounded-none border-0 md:rounded-2xl md:border md:grid md:grid-cols-[var(--sidebar-w)_6px_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)]"
+          style={{ "--sidebar-w": `${sidebarWidth}px` }}
+        >
         {/* LEFT SIDE - hidden on mobile when chat is open */}
         <div className={`relative ${showingChat ? "hidden md:flex" : "flex"} min-h-0 min-w-0 w-full md:w-auto bg-slate-800 flex-col pt-[env(safe-area-inset-top)] md:pt-0`}>
           <div className="shrink-0"><ProfileHeader /></div>
           <div className="shrink-0"><StoryTray /></div>
           <div className="shrink-0"><ActiveTabSwitch /></div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] space-y-2">
-            {activeTab !== "groups" && <div className="md:hidden"><AppDownloadNote variant="banner" /></div>}
             {activeTab === "groups" ? (
               <GroupsList />
             ) : (
@@ -235,7 +236,8 @@ function ChatPage() {
             <NoConversationPlaceholder />
           )}
         </div>
-      </Panel>
+        </Panel>
+      </div>
 
       {viewerIndex && <StoryViewerModal />}
       <AddPeopleModal />

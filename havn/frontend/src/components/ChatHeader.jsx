@@ -87,26 +87,32 @@ function ChatHeader() {
 
         {menuOpen && (
           <div className="absolute right-0 top-8 w-44 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-20 py-1 text-sm overflow-hidden">
-            <button
-              disabled={callState !== "idle"}
-              onClick={() => {
-                startCall(selectedUser, "audio");
-                setMenuOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <PhoneIcon className="w-4 h-4" /> Voice call
-            </button>
-            <button
-              disabled={callState !== "idle"}
-              onClick={() => {
-                startCall(selectedUser, "video");
-                setMenuOpen(false);
-              }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <VideoIcon className="w-4 h-4" /> Video call
-            </button>
+            <span className="block" title={callState !== "idle" ? "You are already in a call" : undefined}>
+              <button
+                disabled={callState !== "idle"}
+                title={callState !== "idle" ? "You are already in a call" : undefined}
+                onClick={() => {
+                  startCall(selectedUser, "audio");
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <PhoneIcon className="w-4 h-4" /> Voice call
+              </button>
+            </span>
+            <span className="block" title={callState !== "idle" ? "You are already in a call" : undefined}>
+              <button
+                disabled={callState !== "idle"}
+                title={callState !== "idle" ? "You are already in a call" : undefined}
+                onClick={() => {
+                  startCall(selectedUser, "video");
+                  setMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-slate-200 hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <VideoIcon className="w-4 h-4" /> Video call
+              </button>
+            </span>
             <button
               onClick={() => {
                 setSelectedUser(null);

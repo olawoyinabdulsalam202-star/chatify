@@ -1,8 +1,9 @@
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import { Platform } from "react-native";
-import notifee, { AndroidForegroundServiceType, AndroidImportance } from "@notifee/react-native";
+import notifee, { AndroidForegroundServiceType } from "@notifee/react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showDialog } from "./dialog";
+import { initNotificationChannels } from "./callNotifications";
 
 const KEEP_ALIVE_KEY = "havn.keepAlive";
 const EXPLAINED_KEY = "havn.keepAliveExplained";
@@ -19,7 +20,7 @@ function registerService() {
 export async function startKeepAlive() {
   if (!nativeReady) return false;
   registerService();
-  await notifee.createChannel({ id: "connection", name: "Connection", importance: AndroidImportance.LOW, sound: null, vibration: false, badge: false });
+  await initNotificationChannels();
   await notifee.displayNotification({
     id: NOTIFICATION_ID,
     title: "Havn",
