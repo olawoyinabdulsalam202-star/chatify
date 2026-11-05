@@ -575,6 +575,9 @@ function SettingsPage() {
           {pushBusy ? "Enabling…" : "Enable notifications"}
         </button>
       )}
+      <p className="mt-3 text-xs text-slate-500">
+        For notifications that show as Havn, install the app from your browser menu (Install app).
+      </p>
     </div>
   );
 

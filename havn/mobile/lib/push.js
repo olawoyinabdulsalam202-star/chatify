@@ -59,11 +59,15 @@ export async function registerPushDevice({ force = false, requestPermission = tr
 
     await AsyncStorage.setItem(LAST_ATTEMPT_KEY, String(Date.now())).catch(() => {});
 
-    await Notifications.setNotificationChannelAsync("messages", {
+    await Notifications.setNotificationChannelAsync("messages-v2", {
       name: "Messages",
       importance: Notifications.AndroidImportance.HIGH,
+      sound: "default",
+      enableVibrate: true,
       vibrationPattern: [0, 250, 200, 250],
+      enableLights: true,
       lightColor: "#C2410C",
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
     });
     let permission = await Notifications.getPermissionsAsync();
     if (permission.status !== "granted" && requestPermission) permission = await Notifications.requestPermissionsAsync();

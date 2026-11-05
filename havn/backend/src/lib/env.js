@@ -74,6 +74,7 @@ export const ENV = {
   APP_MIN_VERSION: process.env.APP_MIN_VERSION || "1.0.0",
   APP_APK_URL: process.env.APP_APK_URL || "",
   APP_RELEASE_NOTES: process.env.APP_RELEASE_NOTES || "",
+  PRESENCE_GRACE_MS: Math.max(0, Number.parseInt(process.env.PRESENCE_GRACE_MS || "300000", 10) || 300000),
   STUN_URLS: (process.env.STUN_URLS || process.env.CALL_STUN_URLS || "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302").split(",").map((url) => url.trim()).filter(Boolean),
   TURN_URLS: (process.env.TURN_URLS || "").split(",").map((url) => url.trim()).filter(Boolean),
   TURN_USERNAME: process.env.TURN_USERNAME || "",

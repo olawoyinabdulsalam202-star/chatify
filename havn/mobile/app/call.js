@@ -65,7 +65,7 @@ export default function CallScreen() {
 
   if (!peer) return <View style={styles.root}><Text style={styles.state}>Waiting for the incoming call...</Text><Pressable onPress={() => router.back()} style={styles.dismiss}><Text style={styles.state}>Close</Text></Pressable></View>;
   const incoming = callState === "incoming";
-  const label = incoming ? "Incoming call" : callState === "calling" ? "Calling" : callState === "ringingOffline" ? "Ringing offline" : callState === "ringing" ? "Ringing" : callState === "reconnecting" ? "Reconnecting" : callState === "connected" ? timeLabel(duration) : callState === "noAnswer" ? "No answer" : callState === "ended" ? "Ended" : "Connecting";
+  const label = incoming ? "Incoming call" : callState === "calling" ? `Calling ${peer.name}...` : callState === "ringingOffline" ? `Ringing ${peer.name}'s phone...` : callState === "ringing" ? `Ringing ${peer.name}...` : callState === "reconnecting" ? "Reconnecting" : callState === "connected" ? timeLabel(duration) : callState === "noAnswer" ? "No answer" : callState === "ended" ? "Ended" : "Connecting";
   const answer = async () => { try { await acceptCall(); } catch (error) { showDialog("Could not answer", error.message || "Check microphone and camera permissions."); } };
   const Control = ({ name, label: text, onPress, active = false, danger = false }) => <Pressable accessibilityRole="button" accessibilityLabel={text} onPress={onPress} style={[styles.control, { backgroundColor: danger ? "#C62828" : active ? theme.primary : "#34312E" }]}><Icon name={name} size={24} color="#FFFFFF" /><Text style={styles.controlText}>{text}</Text></Pressable>;
 

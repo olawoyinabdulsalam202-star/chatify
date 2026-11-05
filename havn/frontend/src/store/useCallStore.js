@@ -14,6 +14,7 @@ async function loadIceServers() {
 }
 let peerConnection = null;
 let callSocketHandlers = null;
+let callEndTimer = null;
 
 // ICE candidates that arrived before we could use them.
 //
@@ -221,6 +222,8 @@ export const useCallStore = create((set, get) => ({
   },
 
   resetCall: () => {
+    if (callEndTimer) clearTimeout(callEndTimer);
+    callEndTimer = null;
     const { localStream, stopVibration } = get();
 
     // Every path out of a call funnels through here — decline, hang up, remote
@@ -304,8 +307,10 @@ export const useCallStore = create((set, get) => ({
         set({ callState: "active", callStartedAt: Date.now() });
       },
       callNoAnswer: () => {
+        set({ callState: "noAnswer" });
         toast.error("No answer");
-        get().resetCall();
+        if (callEndTimer) clearTimeout(callEndTimer);
+        callEndTimer = setTimeout(() => get().resetCall(), 1800);
       },
       callStarted: ({ callId }) => set({ callId }),
       callRinging: ({ callId, state }) => { if (state === "ringing offline") set({ callId, callState: "ringing-offline" }); },
@@ -321,12 +326,12 @@ export const useCallStore = create((set, get) => ({
         toast(`Call ended`);
         get().resetCall();
       },
-      callUnavailable: ({ reconnecting } = {}) => {
+      callUnavailable: ({ reconnecting, message } = {}) => {
         const name = get().peer?.name || "User";
         // `reconnecting` means they're still online but between sockets (screen
         // just locked, app switcher, tunnel). Saying "offline" there sends
         // people chasing a problem that resolves itself in seconds.
-        toast.error(reconnecting ? `${name} is reconnecting — try again in a moment` : `${name} is offline`);
+        toast.error(message || (reconnecting ? `${name} is reconnecting — try again in a moment` : `${name} is offline`));
         get().resetCall();
       },
     };

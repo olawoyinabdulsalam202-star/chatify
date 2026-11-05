@@ -3,6 +3,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import Logo from "../components/Logo";
 import { LockIcon, MailIcon, AtSignIcon, LoaderIcon } from "lucide-react";
 import { Link } from "react-router";
+import AppDownloadNote from "../components/AppDownloadNote";
 
 function SignUpPage() {
   const [formData, setFormData] = useState({ username: "", email: "", password: "" });
@@ -113,6 +114,8 @@ function SignUpPage() {
                 {isSigningUp ? <LoaderIcon className="w-5 h-5 animate-spin mx-auto" /> : "Create account"}
               </button>
             </form>
+
+            <div className="mt-5"><AppDownloadNote /></div>
 
             <div className="mt-6 text-center">
               <Link to="/login" className="auth-link">

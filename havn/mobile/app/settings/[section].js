@@ -1,6 +1,6 @@
 import { showDialog } from "../../lib/dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { AppState, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as Notifications from "expo-notifications";
@@ -17,6 +17,7 @@ import { useTheme } from "../../lib/theme";
 import { useAuthStore } from "../../stores/useAuthStore";
 import { useAppStore } from "../../stores/useAppStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { enableKeepAliveWithExplanation, setKeepAliveEnabled } from "../../lib/keepAlive";
 
 const TITLES = { account: "Account", privacy: "Privacy", chats: "Chats", notifications: "Notifications", help: "Help", devices: "Linked devices" };
 const DISAPPEAR_OPTIONS = [{ value: 0, label: "Off" }, { value: 86400, label: "24 hours" }, { value: 604800, label: "7 days" }, { value: 7776000, label: "90 days" }];
@@ -90,6 +91,7 @@ export default function SettingsSection() {
   const [pushPermission, setPushPermission] = useState("unknown");
   const [pushCanAskAgain, setPushCanAskAgain] = useState(true);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [keepAliveEnabled, setKeepAliveEnabledState] = useState(true);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushTestBusy, setPushTestBusy] = useState(false);
   const [pushDiagnostic, setPushDiagnostic] = useState(null);
@@ -129,6 +131,8 @@ export default function SettingsSection() {
         await refreshPermission();
         const stored = await AsyncStorage.getItem("havn.notificationsEnabled").catch(() => null);
         if (active) setPushEnabled(stored === "true" && (await Notifications.getPermissionsAsync()).status === "granted");
+        const keepAlive = await AsyncStorage.getItem("havn.keepAlive").catch(() => null);
+        if (active) setKeepAliveEnabledState(keepAlive !== "false");
       })();
       const subscription = AppState.addEventListener("change", (state) => { if (state === "active") refreshPermission(); });
       return () => { active = false; subscription.remove(); };
@@ -256,6 +260,23 @@ export default function SettingsSection() {
   const turnOffNotifications = async () => {
     await unregisterPushDevice(); setPushEnabled(false); await AsyncStorage.setItem("havn.notificationsEnabled", "false").catch(() => {}); setNotice("Notifications turned off for this device.");
   };
+  const toggleKeepAlive = async (enabled) => {
+    if (!enabled) {
+      await setKeepAliveEnabled(false);
+      setKeepAliveEnabledState(false);
+      setNotice("Background connection turned off.");
+      return;
+    }
+    try {
+      const started = await enableKeepAliveWithExplanation(() => router.push("/battery-optimization"));
+      setKeepAliveEnabledState(started);
+      if (started) setNotice("Havn will stay connected in the background.");
+      else setKeepAliveEnabledState(false);
+    } catch (error) {
+      setKeepAliveEnabledState(false);
+      setError(error.message || "Couldn't keep Havn connected in the background.");
+    }
+  };
   const sendTestNotification = async () => {
     setPushTestBusy(true); setError(""); setNotice("");
     try { const result = await api("/push/test", { method: "POST" }); setNotice(result.message || "Test notification sent."); }
@@ -341,7 +362,10 @@ export default function SettingsSection() {
         : pushEnabled ? <View style={[styles.statusCard, styles.statusRow, { backgroundColor: theme.background, borderColor: theme.border }]}><Text style={{ color: theme.success, flex: 1 }}>Enabled on this device</Text><Pressable disabled={pushTestBusy} onPress={sendTestNotification}><Text style={{ color: theme.primary, fontWeight: "700" }}>{pushTestBusy ? "Sending…" : "Send test notification"}</Text></Pressable><Pressable onPress={turnOffNotifications}><Text style={{ color: theme.danger, marginLeft: 12 }}>Turn off</Text></Pressable></View>
         : pushPermission === "denied" || blocked ? <View style={[styles.statusCard, { backgroundColor: theme.background, borderColor: theme.border }]}><Text style={{ color: theme.warning || "#B45309" }}>{blocked ? "Notifications are blocked in Android system settings." : "Notifications are not enabled on this device."}</Text>{pushCanAskAgain && <Pressable disabled={pushBusy} onPress={enableNotifications} style={{ marginTop: 12 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>{pushBusy ? "Enabling…" : "Try again"}</Text></Pressable>}<Pressable onPress={() => Linking.openSettings()} style={{ marginTop: 12 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>Open Android notification settings</Text></Pressable></View>
         : <ActionButton title={pushBusy ? "Enabling…" : "Enable notifications"} busy={pushBusy} onPress={enableNotifications} />}
-      </Field><View style={[styles.separator, { backgroundColor: theme.border }]} /><Field title="Notification types" helper="Choose which events can notify you on any device.">
+      </Field>{Platform.OS === "android" && !isExpoGo() && <><View style={[styles.separator, { backgroundColor: theme.border }]} /><Field title="Background connection" helper="Stay online while Havn is in the background. A quiet ongoing notification keeps the connection active.">
+        <ToggleRow title="Stay connected in background" value={keepAliveEnabled} onValueChange={toggleKeepAlive} />
+        <Pressable onPress={() => router.push("/battery-optimization")} style={{ minHeight: 44, justifyContent: "center" }}><Text style={{ color: theme.primary, fontFamily: theme.fontFamily, fontWeight: "700" }}>Battery optimization settings</Text></Pressable>
+      </Field></>}<View style={[styles.separator, { backgroundColor: theme.border }]} /><Field title="Notification types" helper="Choose which events can notify you on any device.">
         {notificationPrefsLoading ? <ActivityIndicator color={theme.primary} /> : <>
           <ToggleRow title="Messages" value={notificationPrefs.messages} onValueChange={(value) => updateNotificationPrefs({ messages: value })} />
           <ToggleRow title="Groups" value={notificationPrefs.groups} onValueChange={(value) => updateNotificationPrefs({ groups: value })} />

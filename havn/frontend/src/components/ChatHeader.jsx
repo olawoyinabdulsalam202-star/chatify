@@ -88,7 +88,7 @@ function ChatHeader() {
         {menuOpen && (
           <div className="absolute right-0 top-8 w-44 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-20 py-1 text-sm overflow-hidden">
             <button
-              disabled={!isOnline || callState !== "idle"}
+              disabled={callState !== "idle"}
               onClick={() => {
                 startCall(selectedUser, "audio");
                 setMenuOpen(false);
@@ -98,7 +98,7 @@ function ChatHeader() {
               <PhoneIcon className="w-4 h-4" /> Voice call
             </button>
             <button
-              disabled={!isOnline || callState !== "idle"}
+              disabled={callState !== "idle"}
               onClick={() => {
                 startCall(selectedUser, "video");
                 setMenuOpen(false);

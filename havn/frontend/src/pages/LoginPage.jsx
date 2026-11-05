@@ -5,11 +5,12 @@ import { MailIcon, LoaderIcon, LockIcon } from "lucide-react";
 import { Link } from "react-router";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
+import AppDownloadNote from "../components/AppDownloadNote";
 
 function LoginPage() {
   const [formData, setFormData] = useState({ email: "", password: "" });
   const { login, isLoggingIn } = useAuthStore();
-  const [showQr, setShowQr] = useState(false);
+  const [showQr, setShowQr] = useState(() => window.matchMedia("(min-width: 768px)").matches);
   const [qrCode, setQrCode] = useState("");
   const [qrState, setQrState] = useState("idle");
 
@@ -70,8 +71,24 @@ function LoginPage() {
           <Logo tone="invert" size={30} />
         </div>
 
+        <div className={`${showQr ? "md:flex" : "hidden"} hidden min-w-0 md:w-1/2 p-5 sm:p-10 flex-col items-center justify-center`}>
+          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900/70 p-6 text-center">
+            <p className="text-sm text-slate-300">Scan with your Havn app to log in</p>
+            {qrState === "pending" && qrCode ? (
+              <img className="mx-auto mt-4 size-52 rounded-lg bg-white p-2" alt="QR code to log in to Havn" src={`https://api.qrserver.com/v1/create-qr-code/?size=208x208&data=${encodeURIComponent(`havn://qr/${qrCode}\nhttps://havn.kairos-va.com/qr/${qrCode}`)}`} />
+            ) : qrState === "approved" ? (
+              <p className="py-16 text-sm text-slate-300">Logging you in...</p>
+            ) : qrState === "expired" ? (
+              <button type="button" onClick={startQr} className="mt-4 min-h-10 px-4 text-sm text-cyan-400">Code expired. Refresh QR code</button>
+            ) : (
+              <p className="py-16 text-sm text-slate-400">Preparing QR code...</p>
+            )}
+            <button type="button" onClick={() => setShowQr(false)} className="mt-4 min-h-10 w-full rounded-lg border border-slate-700 text-sm text-slate-300 hover:bg-slate-700/40">Log in with email</button>
+          </div>
+        </div>
+
         {/* FORM SIDE */}
-        <div className="min-w-0 md:w-1/2 p-5 sm:p-10 flex items-center justify-center">
+        <div className={`min-w-0 md:w-1/2 p-5 sm:p-10 ${showQr ? "md:hidden" : ""} flex items-center justify-center`}>
           <div className="w-full max-w-md">
             <div className="mb-8">
               <h2 className="auth-heading font-bold text-slate-100 mb-2">Welcome back</h2>
@@ -112,11 +129,16 @@ function LoginPage() {
               </button>
             </form>
 
-            <button type="button" onClick={() => setShowQr((value) => !value)} className="mt-5 w-full rounded-lg border border-slate-700 py-2.5 text-sm text-slate-300 hover:bg-slate-700/40">
+            <AppDownloadNote />
+
+            <button type="button" onClick={() => setShowQr((value) => !value)} className="mt-5 hidden w-full rounded-lg border border-slate-700 py-2.5 text-sm text-slate-300 hover:bg-slate-700/40 md:block">
+              Log in with QR code
+            </button>
+            <button type="button" onClick={() => setShowQr((value) => !value)} className="mt-5 w-full rounded-lg border border-slate-700 py-2.5 text-sm text-slate-300 hover:bg-slate-700/40 md:hidden">
               {showQr ? "Sign in with password" : "Log in with QR code"}
             </button>
             {showQr && (
-              <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/70 p-4 text-center">
+              <div className="mt-4 rounded-xl border border-slate-700 bg-slate-900/70 p-4 text-center md:hidden">
                 {qrState === "pending" && qrCode ? (
                   <>
                     <img className="mx-auto h-52 w-52 rounded-lg bg-white p-2" alt="QR code to log in to Havn" src={`https://api.qrserver.com/v1/create-qr-code/?size=208x208&data=${encodeURIComponent(`havn://qr/${qrCode}\nhttps://havn.kairos-va.com/qr/${qrCode}`)}`} />

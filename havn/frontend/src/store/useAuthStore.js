@@ -7,6 +7,37 @@ import { BACKEND_URL } from "../lib/config";
 // Presence watchers are attached to `window` once per page load, not once per
 // connect — otherwise every reconnect would stack another duplicate listener.
 let presenceWatchersAttached = false;
+let heartbeatWorker = null;
+let heartbeatWorkerUrl = null;
+let heartbeatFallbackTimer = null;
+
+function stopHeartbeat() {
+  heartbeatWorker?.terminate();
+  heartbeatWorker = null;
+  if (heartbeatWorkerUrl) URL.revokeObjectURL(heartbeatWorkerUrl);
+  heartbeatWorkerUrl = null;
+  if (heartbeatFallbackTimer) clearInterval(heartbeatFallbackTimer);
+  heartbeatFallbackTimer = null;
+}
+
+function startHeartbeat(socket) {
+  stopHeartbeat();
+  const sendHeartbeat = () => {
+    if (socket.connected) socket.emit("heartbeat", Date.now());
+  };
+  try {
+    const workerSource = "setInterval(() => postMessage('heartbeat'), 25000);";
+    heartbeatWorkerUrl = URL.createObjectURL(new Blob([workerSource], { type: "text/javascript" }));
+    heartbeatWorker = new Worker(heartbeatWorkerUrl);
+    heartbeatWorker.onmessage = sendHeartbeat;
+    heartbeatWorker.onerror = () => {
+      stopHeartbeat();
+      heartbeatFallbackTimer = setInterval(sendHeartbeat, 25000);
+    };
+  } catch {
+    heartbeatFallbackTimer = setInterval(sendHeartbeat, 25000);
+  }
+}
 
 export const useAuthStore = create((set, get) => ({
   authUser: null,
@@ -227,13 +258,22 @@ export const useAuthStore = create((set, get) => ({
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      reconnectionDelayMax: 30000,
+      randomizationFactor: 0.5,
       timeout: 20000,
     });
 
     socket.connect();
 
     set({ socket });
+
+    socket.on("connect", () => {
+      startHeartbeat(socket);
+      import("./useChatStore").then(({ useChatStore }) => {
+        useChatStore.getState().getMyChatPartners({ quiet: true });
+      });
+    });
+    socket.on("disconnect", stopHeartbeat);
 
     socket.on("connect_error", (error) => {
       // Previously this failed silently, which is why a totally unreachable
@@ -307,7 +347,11 @@ export const useAuthStore = create((set, get) => ({
     // "app open and online" actually means visible-to-everyone.
     const revive = () => {
       const current = useAuthStore.getState();
-      if (current.authUser && !current.socket?.connected) current.connectSocket();
+      if (!current.authUser) return;
+      if (!current.socket?.connected) current.connectSocket();
+      import("./useChatStore").then(({ useChatStore }) => {
+        useChatStore.getState().getMyChatPartners({ quiet: true });
+      });
     };
 
     document.addEventListener("visibilitychange", () => {
@@ -322,6 +366,7 @@ export const useAuthStore = create((set, get) => ({
 
   disconnectSocket: () => {
     const socket = get().socket;
+    stopHeartbeat();
     if (!socket) return;
     socket.removeAllListeners();
     socket.disconnect();

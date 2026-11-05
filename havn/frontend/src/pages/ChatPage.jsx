@@ -22,6 +22,7 @@ import AssistantListRow from "../components/AssistantListRow";
 import AssistantChat from "../components/AssistantChat";
 import { useAssistantStore } from "../store/useAssistantStore";
 import { useSidebarWidth } from "../hooks/useSidebarWidth";
+import AppDownloadNote from "../components/AppDownloadNote";
 
 function ChatPage() {
   const { width: sidebarWidth, maxWidth: sidebarMaxWidth, setWidth, persistWidth, clampWidth } = useSidebarWidth();
@@ -185,6 +186,7 @@ function ChatPage() {
           <div className="shrink-0"><StoryTray /></div>
           <div className="shrink-0"><ActiveTabSwitch /></div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] space-y-2">
+            {activeTab !== "groups" && <div className="md:hidden"><AppDownloadNote variant="banner" /></div>}
             {activeTab === "groups" ? (
               <GroupsList />
             ) : (

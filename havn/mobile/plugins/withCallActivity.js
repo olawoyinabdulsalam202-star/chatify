@@ -39,8 +39,8 @@ module.exports = function withCallActivity(config) {
     }
     app.service = app.service || [];
     const callService = app.service.find((service) => service.$?.["android:name"] === "app.notifee.core.ForegroundService");
-    if (callService) callService.$["android:foregroundServiceType"] = "camera|microphone";
-    else app.service.push({ $: { "android:name": "app.notifee.core.ForegroundService", "android:exported": "false", "android:foregroundServiceType": "camera|microphone" } });
+    if (callService) callService.$["android:foregroundServiceType"] = "camera|microphone|dataSync";
+    else app.service.push({ $: { "android:name": "app.notifee.core.ForegroundService", "android:exported": "false", "android:foregroundServiceType": "camera|microphone|dataSync" } });
     return mod;
   });
 };

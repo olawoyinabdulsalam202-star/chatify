@@ -81,6 +81,7 @@ export const useAuthStore = create((set, get) => ({
   clearSession: async () => {
     const userId = get().authUser?._id;
     if (userId) await clearCache("", userId);
+    await import("../lib/keepAlive").then(({ stopKeepAlive }) => stopKeepAlive());
     disconnectSocket();
     await storeAccessToken(null);
     await SecureStore.deleteItemAsync(SESSION_KEY).catch(() => {});

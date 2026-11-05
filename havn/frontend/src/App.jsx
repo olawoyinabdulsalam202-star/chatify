@@ -24,6 +24,7 @@ import UpdatePrompt from "./components/UpdatePrompt";
 import NotificationPermissionBanner from "./components/NotificationPermissionBanner";
 import { loadFont, getFontStack } from "./lib/fonts";
 import { playNotificationSoundOnce } from "./lib/audioUnlock";
+import { syncPushSubscription } from "./lib/push";
 
 import { Toaster } from "react-hot-toast";
 
@@ -56,6 +57,10 @@ function App() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    if (authUser) syncPushSubscription({ createIfMissing: true });
+  }, [authUser?._id]);
 
   useEffect(() => {
     const updateFocus = () => {

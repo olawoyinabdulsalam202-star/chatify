@@ -49,7 +49,7 @@ const userSocketMap = {}; // { userId: Set<socketId> }
 // contact list — and therefore become uncallable — while their app was still
 // very much open. The client reconnects on visibility/focus/online, so a real
 // return lands well inside this window; only a genuine close stays offline.
-const OFFLINE_GRACE_MS = 45000;
+const PRESENCE_GRACE_MS = ENV.PRESENCE_GRACE_MS;
 const pendingOfflineTimers = {}; // { userId: Timeout }
 const pendingCalls = new Map();
 const callAttempts = new Map();
@@ -164,6 +164,7 @@ function markOnline(userId, socketId) {
 }
 
 function scheduleOffline(userId, socketId) {
+  const disconnectedAt = new Date();
   const sockets = userSocketMap[userId];
   if (sockets) {
     sockets.delete(socketId);
@@ -182,18 +183,19 @@ function scheduleOffline(userId, socketId) {
       // stamp — a $setOnInsert-less conditional keeps the explicit logout from
       // being clobbered by the timer.
       User.updateOne(
-        { _id: userId, $or: [{ lastSeenAt: { $exists: false } }, { lastSeenAt: { $lt: new Date() } }] },
-        { $set: { lastSeenAt: new Date() } }
-      ).catch(() => {});
+        { _id: userId, $or: [{ lastSeenAt: { $exists: false } }, { lastSeenAt: { $lt: disconnectedAt } }] },
+        { $set: { lastSeenAt: disconnectedAt } }
+      ).catch(() => {}).finally(() => {
+        if (userSocketMap[userId]?.size) return;
+        console.log("Presence: user offline after grace window", userId);
+        emitPresenceToFriends(userId, false).catch(() => {});
+      });
 
       // Diagnostic for hosted environments (Render): confirms the grace timer
       // actually fired and the user was reaped, so a "nobody ever shows offline"
       // report can be traced to whether this line prints in production logs.
-      console.log("Presence: user offline after grace window", userId);
-
-      emitPresenceToFriends(userId, false).catch(() => {});
     }
-  }, OFFLINE_GRACE_MS);
+  }, PRESENCE_GRACE_MS);
 }
 
 // Returns any one live socket id for a user (used for direct, single-target
@@ -299,6 +301,8 @@ io.on("connection", (socket) => {
   socket.on("typing", ({ receiverId }) => {
     io.to(`user:${receiverId}`).emit("typing", { senderId: userId });
   });
+
+  socket.on("heartbeat", (sentAt) => socket.emit("heartbeatAck", sentAt));
 
   socket.on("stopTyping", ({ receiverId }) => {
     io.to(`user:${receiverId}`).emit("stopTyping", { senderId: userId });

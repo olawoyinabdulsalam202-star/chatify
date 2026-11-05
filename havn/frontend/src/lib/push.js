@@ -110,11 +110,19 @@ export async function disablePushNotifications() {
 // Re-registers an existing grant on startup. Permission persists across visits,
 // but the subscription row can be missing server-side (database reset, a
 // pruned-then-revived endpoint), so this keeps them in step without prompting.
-export async function syncPushSubscription() {
+export async function syncPushSubscription({ createIfMissing = false } = {}) {
   if (!pushSupported() || Notification.permission !== "granted") return;
   try {
     const registration = await navigator.serviceWorker.ready;
-    const subscription = await registration.pushManager.getSubscription();
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription && createIfMissing) {
+      const { data: config } = await axiosInstance.get("/push/config");
+      if (!config.enabled || !config.publicKey) return;
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+      });
+    }
     if (!subscription) return;
     const raw = subscription.toJSON();
     await axiosInstance.post("/push/subscribe", { endpoint: raw.endpoint, keys: raw.keys });

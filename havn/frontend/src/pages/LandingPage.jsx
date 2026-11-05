@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import Logo from "../components/Logo";
 import SiteFooter from "../components/SiteFooter";
+import AppDownloadNote from "../components/AppDownloadNote";
 import {
   Lock,
   Mic,
@@ -296,6 +297,14 @@ function LandingPage() {
               <p className="mt-2 text-sm leading-relaxed text-[#57534E]">{desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section id="download" className="mx-auto max-w-6xl px-6 py-12 lg:py-16">
+        <div className="mx-auto max-w-3xl">
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[#C2410C]">Mobile app</span>
+          <h2 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">Get the Havn app</h2>
+          <div className="mt-5"><AppDownloadNote variant="section" /></div>
         </div>
       </section>
 

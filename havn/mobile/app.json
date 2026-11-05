@@ -25,8 +25,9 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "messages",
-          "color": "#C2410C"
+          "defaultChannel": "messages-v2",
+          "color": "#C2410C",
+          "icon": "./assets/notification-icon.png"
         }
       ],
       "expo-video",
@@ -57,6 +58,7 @@
         "POST_NOTIFICATIONS",
         "WAKE_LOCK",
         "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_DATA_SYNC",
         "FOREGROUND_SERVICE_MICROPHONE",
         "FOREGROUND_SERVICE_CAMERA",
         "BLUETOOTH_CONNECT",
